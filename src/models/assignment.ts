@@ -109,13 +109,37 @@ export interface SwitchbackAssignment {
 }
 
 /**
+ * Assignment for stepped wedge designs
+ *
+ * Tracks which cluster a unit belongs to and whether that cluster
+ * is currently in control or treatment based on the current time step.
+ */
+export interface SteppedWedgeAssignment {
+  /** Type identifier for stepped wedge assignment */
+  type: 'stepped_wedge';
+  /** Current step number in the design */
+  currentStep: number;
+  /** When the current step started */
+  stepStart: Date;
+  /** When the current step ends */
+  stepEnd: Date;
+  /** Cluster ID this unit belongs to */
+  clusterId: string;
+  /** Step number when this cluster switches from control to treatment */
+  switchStep: number;
+  /** Whether this cluster is currently receiving treatment (true if currentStep >= switchStep) */
+  inTreatment: boolean;
+}
+
+/**
  * Union type for design-specific assignment data
  */
 export type DesignSpecificAssignment =
   | { type: 'standard'; variantKey: string }
   | { type: 'factorial'; data: FactorialAssignment }
   | { type: 'within_subjects'; data: WithinSubjectsAssignment }
-  | { type: 'switchback'; data: SwitchbackAssignment };
+  | { type: 'switchback'; data: SwitchbackAssignment }
+  | { type: 'stepped_wedge'; data: SteppedWedgeAssignment };
 
 /**
  * Assignment event - when a unit is assigned to a variant
@@ -413,6 +437,15 @@ export function isSwitchbackAssignment(
 }
 
 /**
+ * Type guard to check if assignment is stepped wedge
+ */
+export function isSteppedWedgeAssignment(
+  assignment: DesignSpecificAssignment
+): assignment is { type: 'stepped_wedge'; data: SteppedWedgeAssignment } {
+  return assignment.type === 'stepped_wedge';
+}
+
+/**
  * Helper to extract variant key from any assignment type
  */
 export function getVariantKey(assignment: DesignSpecificAssignment): string {
@@ -425,5 +458,7 @@ export function getVariantKey(assignment: DesignSpecificAssignment): string {
       return assignment.data.variantKey;
     case 'switchback':
       return assignment.data.variantKey;
+    case 'stepped_wedge':
+      return assignment.data.inTreatment ? 'treatment' : 'control';
   }
 }

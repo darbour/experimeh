@@ -26,6 +26,8 @@ export {
   FactorialDesignConfig,
   WithinSubjectsDesignConfig,
   SwitchbackDesignConfig,
+  SteppedWedgeDesignConfig,
+  SteppedWedgeSchedule,
   MultivariateDesignConfig,
   DesignConfig,
   TargetingRule,
@@ -43,6 +45,7 @@ export {
   isFactorialDesign,
   isWithinSubjectsDesign,
   isSwitchbackDesign,
+  isSteppedWedgeDesign,
   isMultivariateDesign,
 } from './experiment';
 
@@ -96,6 +99,7 @@ export {
   FactorialAssignment,
   WithinSubjectsAssignment,
   SwitchbackAssignment,
+  SteppedWedgeAssignment,
   DesignSpecificAssignment,
   AssignmentEvent,
   GetAssignmentRequest,
@@ -115,6 +119,7 @@ export {
   isFactorialAssignment,
   isWithinSubjectsAssignment,
   isSwitchbackAssignment,
+  isSteppedWedgeAssignment,
   getVariantKey,
 } from './assignment';
 
@@ -177,6 +182,9 @@ export {
   FactorialAnalysisResult,
   WithinSubjectsAnalysisResult,
   SwitchbackAnalysisResult,
+  EffectEstimate,
+  ClusterEffect,
+  SteppedWedgeAnalysisResult,
   MultipleTestingCorrection,
   SampleRatioMismatch,
   DataQualityCheck,
@@ -192,6 +200,7 @@ export {
   isFactorialAnalysis,
   isWithinSubjectsAnalysis,
   isSwitchbackAnalysis,
+  isSteppedWedgeAnalysis,
   isStatisticallySignificant,
   getSignificanceLevel,
   calculateRelativeDifference,

@@ -10,6 +10,7 @@ A comprehensive feature flag based experimentation system supporting complex exp
 - **Factorial Design**: Test multiple factors simultaneously and detect interactions
 - **Within-Subjects Design**: Repeated measures with counterbalancing
 - **Switchback Experiments**: Temporal switching to mitigate network interference
+- **Stepped Wedge Design**: Cluster-randomized trial where all clusters start in control and switch to treatment at randomized times
 - **Statistical Analysis**: Built-in statistical tests with proper corrections
 - **High Performance**: Deterministic assignment with caching (<10ms latency)
 - **Scalable**: Event-driven architecture with Kafka
@@ -152,6 +153,22 @@ Repeated measures with counterbalancing:
   "designConfig": {
     "counterbalancingScheme": "latin_square",
     "sessionCount": 4
+  }
+}
+```
+
+### Stepped Wedge Design
+
+Cluster-randomized trial where all clusters start in control and switch to treatment at randomized times:
+
+```typescript
+{
+  "designType": "stepped_wedge",
+  "designConfig": {
+    "numSteps": 5,
+    "stepDurationMinutes": 10080,  // 1 week per step
+    "clusterKey": "hospital_id",
+    "numClusters": 20
   }
 }
 ```

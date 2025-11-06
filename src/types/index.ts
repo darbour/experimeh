@@ -3,7 +3,7 @@
  */
 
 export type ExperimentStatus = 'draft' | 'running' | 'paused' | 'completed';
-export type DesignType = 'ab' | 'multivariate' | 'factorial' | 'within_subjects' | 'switchback';
+export type DesignType = 'ab' | 'multivariate' | 'factorial' | 'within_subjects' | 'switchback' | 'stepped_wedge';
 export type RandomizationUnit = 'user' | 'session' | 'device' | 'other';
 
 /**
@@ -50,11 +50,27 @@ export interface FactorLevel {
   levels: string[];
 }
 
+export interface SteppedWedgeSchedule {
+  /** Map of step number → cluster IDs that switch at this step */
+  stepToClusters: Record<number, string[]>;
+  /** Map of cluster ID → step at which it switches */
+  clusterToStep: Record<string, number>;
+  /** Randomization seed for reproducibility */
+  seed: string;
+}
+
 export interface DesignConfig {
   type: DesignType;
   factors?: FactorLevel[];
   switchbackPeriodMinutes?: number;
   counterbalancingScheme?: string;
+  // Stepped wedge configuration
+  numSteps?: number;
+  stepDurationMinutes?: number;
+  numClusters?: number;
+  clusterKey?: string;
+  schedule?: SteppedWedgeSchedule;
+  permanentControlClusters?: string[];
 }
 
 export interface Experiment {
@@ -101,6 +117,13 @@ export interface AssignmentResult {
   factors?: Record<string, string>;
   assigned: boolean;
   reason?: string;
+  // Stepped wedge specific fields
+  currentStep?: number;
+  stepStart?: Date;
+  stepEnd?: Date;
+  clusterId?: string;
+  switchStep?: number;
+  inTreatment?: boolean;
 }
 
 /**

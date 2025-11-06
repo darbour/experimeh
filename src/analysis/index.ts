@@ -9,6 +9,8 @@
  * - corrections: Multiple testing corrections (Bonferroni, BH, Holm, sequential)
  * - power: Power analysis and sample size calculations
  * - variance-reduction: CUPED and stratification for improved sensitivity
+ * - stepped-wedge-analysis: Mixed effects models for stepped wedge cluster randomized trials
+ * - cluster-analysis: Cluster-robust inference, bootstrap, and design effects
  * - analyzer: Main orchestrator for experiment analysis
  */
 
@@ -91,6 +93,38 @@ export {
   type RegressionAdjustmentResult
 } from './variance-reduction';
 
+// Stepped Wedge Analysis
+export {
+  analyzeSteppedWedge,
+  calculateTreatmentEffect,
+  calculateTimeEffect,
+  calculateICC,
+  estimateClusterEffects,
+  validateModelAssumptions,
+  simplifiedTimeSeriesAnalysis,
+  type SteppedWedgeData,
+  type ClusterData,
+  type StepData,
+  type SteppedWedgeAnalysisResult,
+  type TreatmentEffectResult,
+  type TimeEffectResult,
+  type ICCResult,
+  type ClusterEffectsResult,
+  type ModelDiagnostics,
+  type ModelFitStatistics
+} from './stepped-wedge-analysis';
+
+// Cluster Analysis
+export {
+  calculateClusteredStandardErrors,
+  clusterBootstrap,
+  calculateDesignEffect,
+  type ClusteredData,
+  type ClusterRobustSEResult,
+  type BootstrapResult,
+  type DesignEffectResult
+} from './cluster-analysis';
+
 // Main Analyzer
 export {
   ExperimentAnalyzer,
@@ -98,6 +132,7 @@ export {
   calculateSampleSize,
   type ExperimentData,
   type FactorialDesign,
+  type SteppedWedgeDesign,
   type AnalysisResult,
   type FactorialAnalysisResult,
   type SwitchbackAnalysisResult

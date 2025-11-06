@@ -210,7 +210,7 @@ The system will provide a unified platform for feature management, experiment ex
   "name": "string",
   "description": "string",
   "status": "draft|running|paused|completed",
-  "designType": "ab|multivariate|factorial|within_subjects|switchback",
+  "designType": "ab|multivariate|factorial|within_subjects|switchback|stepped_wedge",
 
   "hypotheses": "string",
   "primaryMetric": "string",
@@ -426,6 +426,111 @@ Combine multiple methodologies:
 - **Factorial + Switchback**: Test multiple factors with temporal switching
 - **Within-Subjects + Factorial**: Multiple factors, repeated measures
 - **Stratified Switchback**: Different segments switch at different times
+
+### 6.5 Stepped Wedge Design
+
+#### Concept
+- All clusters begin in control condition
+- Clusters switch from control to treatment at randomized time intervals
+- Once switched, clusters remain in treatment (unidirectional)
+- By study end, all clusters have received treatment
+- Controls for time trends by design
+
+#### Use Cases
+- **Healthcare Rollouts**: Implementing new clinical protocols across hospital units where ethical considerations require all units to eventually receive the intervention
+- **Policy Implementation**: Rolling out new policies across regions or districts
+- **Education**: Deploying new curricula across schools where withholding from some long-term is not ethical
+- **Infrastructure**: Implementing system changes where full rollback is not feasible
+
+#### Implementation Approach
+
+```javascript
+function assignSteppedWedge(clusterId, currentTime, experiment) {
+  const config = experiment.designConfig;
+  const { numSteps, stepDurationMinutes, schedule } = config;
+
+  // Calculate current step
+  const elapsedMinutes = (currentTime - experiment.startDate) / 60000;
+  const currentStep = Math.floor(elapsedMinutes / stepDurationMinutes);
+
+  // Determine when this cluster switches to treatment
+  const switchStep = schedule.clusterToStep[clusterId];
+
+  // Assign based on whether cluster has switched yet
+  return currentStep >= switchStep ? 'treatment' : 'control';
+}
+
+// Generate balanced switching schedule
+function generateSchedule(numClusters, numSteps, seed) {
+  // Randomly assign clusters to steps
+  const clusterIds = Array.from({ length: numClusters }, (_, i) => `cluster-${i}`);
+  const shuffled = deterministicShuffle(clusterIds, seed);
+
+  // Distribute evenly across steps
+  const clustersPerStep = Math.ceil(numClusters / numSteps);
+  const schedule = {};
+
+  shuffled.forEach((id, index) => {
+    schedule[id] = Math.floor(index / clustersPerStep) + 1; // Step 0 is baseline
+  });
+
+  return schedule;
+}
+```
+
+#### Design Considerations
+- **Cluster Definition**: Clear, stable groupings (hospitals, schools, regions)
+- **Cluster Size**: Sufficient individuals within each cluster for stable estimates
+- **Number of Clusters**: Typically need 12+ clusters for adequate power
+- **Number of Steps**: Balance between granular rollout (more steps) and statistical power (fewer steps with more clusters per step)
+- **Step Duration**: Long enough to observe treatment effects, short enough to complete study in reasonable time
+- **Baseline Period**: Step 0 provides pure control data before any switching
+
+#### Analysis Considerations
+
+**Statistical Model**:
+```
+Y_ij = β₀ + β₁(time) + β₂(treatment) + u_i + ε_ij
+
+Where:
+- Y_ij = outcome for individual j in cluster i
+- time = step number (controls for secular trends)
+- treatment = indicator for treatment status
+- u_i = random intercept for cluster i (accounts for ICC)
+- ε_ij = individual-level residual error
+```
+
+**Key Statistical Concepts**:
+- **Intracluster Correlation (ICC)**: Correlation between individuals within same cluster
+- **Mixed Effects Models**: Account for both cluster-level (random) and treatment (fixed) effects
+- **Time Trends**: Model and adjust for underlying temporal changes
+- **Cluster-Robust Standard Errors**: Account for within-cluster correlation
+
+**Analysis Steps**:
+1. Fit mixed effects model with cluster random intercepts
+2. Include time as fixed effect to control for secular trends
+3. Treatment effect is β₂ coefficient
+4. Calculate ICC from variance components
+5. Test assumptions: normality of residuals, homoscedasticity
+6. Report treatment effect with cluster-adjusted confidence intervals
+
+**Sample Size Considerations**:
+- Need to account for ICC in power calculations
+- Design effect: DE = 1 + (m - 1) × ICC, where m is average cluster size
+- Higher ICC requires more clusters or larger cluster sizes
+- Typical ICC values: 0.01-0.05 in healthcare, 0.10-0.20 in education
+
+#### Comparison to Parallel and Crossover Designs
+
+**vs. Parallel Group**:
+- Stepped wedge: All receive treatment eventually (ethical advantage)
+- Stepped wedge: Controls for time trends
+- Parallel group: Simpler analysis, potentially higher power
+
+**vs. Crossover**:
+- Stepped wedge: Unidirectional (no washout issues)
+- Stepped wedge: Natural for interventions that can't be withdrawn
+- Crossover: Bidirectional switching, requires washout periods
 
 ---
 

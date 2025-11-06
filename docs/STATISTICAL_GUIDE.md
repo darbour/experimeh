@@ -12,6 +12,7 @@ A comprehensive guide to statistical methods for online experimentation, from fo
 6. [Bayesian vs Frequentist Approaches](#bayesian-vs-frequentist-approaches)
 7. [When to Use Sequential Testing](#when-to-use-sequential-testing)
 8. [CUPED Variance Reduction Guide](#cuped-variance-reduction-guide)
+9. [Stepped Wedge Analysis](#stepped-wedge-analysis)
 
 ---
 
@@ -1964,6 +1965,591 @@ if (cupedResult.correlation < 0.3) {
 
 ---
 
+## Stepped Wedge Analysis
+
+### What is Stepped Wedge Design?
+
+A **stepped wedge cluster-randomized trial** where:
+- All clusters start in control
+- Clusters progressively switch from control to treatment at randomized times
+- Switching is unidirectional (once treated, stay treated)
+- By study end, all clusters receive treatment
+
+**Visual Example**:
+```
+Time →     Step 0   Step 1   Step 2   Step 3   Step 4
+Cluster 1:   C        C        T        T        T
+Cluster 2:   C        T        T        T        T
+Cluster 3:   C        C        C        T        T
+Cluster 4:   C        C        C        C        T
+
+C = Control, T = Treatment
+```
+
+### Statistical Model
+
+#### Basic Mixed Effects Model
+
+```
+Y_ij = β₀ + β₁(time) + β₂(treatment) + u_i + ε_ij
+
+Where:
+  Y_ij    = outcome for individual j in cluster i
+  β₀      = baseline intercept
+  β₁      = time trend coefficient (secular changes)
+  β₂      = treatment effect coefficient (PRIMARY ESTIMAND)
+  time    = step number (0, 1, 2, ...)
+  treatment = 0 (control) or 1 (treatment)
+  u_i     = random intercept for cluster i ~ N(0, τ²)
+  ε_ij    = individual error ~ N(0, σ²)
+```
+
+**Key Parameters**:
+- **β₂**: Treatment effect (what we care about!)
+- **τ²**: Between-cluster variance
+- **σ²**: Within-cluster variance
+- **ICC**: Intracluster correlation = τ² / (τ² + σ²)
+
+### Understanding Intracluster Correlation (ICC)
+
+**Definition**: Correlation between outcomes of individuals in the same cluster.
+
+**Formula**:
+```
+ICC = τ² / (τ² + σ²)
+
+Where:
+  τ² = between-cluster variance
+  σ² = within-cluster variance
+```
+
+**Interpretation**:
+```
+ICC = 0.00: No clustering effect (individuals are independent)
+ICC = 0.01: Small clustering (common in large populations)
+ICC = 0.05: Moderate clustering (typical in healthcare)
+ICC = 0.10: Substantial clustering (schools, communities)
+ICC = 0.20: Very high clustering (families, households)
+```
+
+**Example Calculation**:
+```typescript
+// After fitting mixed model
+const betweenClusterVar = 25;  // τ²
+const withinClusterVar = 475;  // σ²
+
+const icc = betweenClusterVar / (betweenClusterVar + withinClusterVar);
+// ICC = 25 / 500 = 0.05 (5%)
+
+console.log(`ICC: ${icc}`);
+// Interpretation: 5% of total variance is due to cluster membership
+```
+
+**Why ICC Matters**:
+- High ICC → Individuals in same cluster are more similar
+- High ICC → Need more clusters (not just more individuals)
+- High ICC → Effective sample size is reduced
+
+### Cluster Random Effects
+
+**Random Intercept Model**:
+
+Each cluster has its own baseline level (u_i):
+
+```
+Cluster 1: u_1 = +5  (naturally higher outcomes)
+Cluster 2: u_2 = -2  (naturally lower outcomes)
+Cluster 3: u_3 = +1  (slightly above average)
+Cluster 4: u_4 = -4  (much lower outcomes)
+```
+
+**Example**:
+```typescript
+interface ClusterEffect {
+  clusterId: string;
+  randomIntercept: number;  // u_i
+  sampleSize: number;
+}
+
+// Example cluster effects from fitted model
+const clusterEffects: ClusterEffect[] = [
+  { clusterId: 'hospital-1', randomIntercept: 4.2, sampleSize: 150 },
+  { clusterId: 'hospital-2', randomIntercept: -1.8, sampleSize: 165 },
+  { clusterId: 'hospital-3', randomIntercept: 2.5, sampleSize: 142 },
+  { clusterId: 'hospital-4', randomIntercept: -3.1, sampleSize: 158 }
+];
+
+// Hospital 1 has naturally higher compliance (u_i = 4.2%)
+// Hospital 4 has naturally lower compliance (u_i = -3.1%)
+// Treatment effect is estimated AFTER accounting for these differences
+```
+
+### Time Trend Adjustment
+
+**Why Include Time?**
+
+Without time adjustment, we might confuse:
+- Treatment effect
+- Secular trends (natural changes over time)
+
+**Example**:
+```
+Scenario: Hand hygiene compliance naturally improving 1% per month
+
+Without time adjustment:
+- Treatment effect appears larger (includes natural trend)
+- β₂ = 5% (inflated)
+
+With time adjustment:
+- Separates treatment from trend
+- β₁ = 1% per step (time trend)
+- β₂ = 3% (true treatment effect)
+```
+
+**Implementation**:
+```typescript
+// Model includes both time and treatment
+const model = {
+  formula: 'Y ~ time + treatment + (1 | cluster)',
+  data: steppedWedgeData
+};
+
+// Results separate time from treatment
+const results = {
+  timeEffect: {
+    coefficient: 1.2,  // β₁: 1.2% increase per step naturally
+    pValue: 0.003
+  },
+  treatmentEffect: {
+    coefficient: 3.1,  // β₂: 3.1% treatment effect after adjusting for time
+    pValue: 0.001
+  }
+};
+```
+
+### Statistical Assumptions
+
+#### 1. Normality of Residuals
+
+**Check**:
+```typescript
+// After fitting model, examine residuals
+const residuals = model.residuals;
+
+// Visual check: Q-Q plot
+plotQQ(residuals);
+
+// Statistical test: Shapiro-Wilk
+const normalityTest = shapiroWilk(residuals);
+if (normalityTest.pValue < 0.05) {
+  console.warn('⚠️  Residuals not normally distributed');
+  // Consider: transformation, robust SE, or larger samples
+}
+```
+
+**If Violated**:
+- Large samples: Robust to violations (CLT)
+- Small samples: Transform outcome or use robust methods
+- Binary outcomes: Use logistic mixed model instead
+
+#### 2. Homoscedasticity (Constant Variance)
+
+**Check**:
+```typescript
+// Plot residuals vs. fitted values
+plot(model.fitted, model.residuals);
+
+// Look for fan shape (heteroscedasticity)
+// Bresuch-Pagan test
+const hetTest = breuschPagan(model);
+if (hetTest.pValue < 0.05) {
+  console.warn('⚠️  Heteroscedasticity detected');
+}
+```
+
+**If Violated**:
+- Use heteroscedasticity-consistent standard errors
+- Transform outcome (log, sqrt)
+- Use weighted regression
+
+#### 3. Independent Clusters
+
+**Assumption**: Clusters should be independent of each other
+
+**Violations**:
+- Geographic proximity (spillover effects)
+- Shared resources
+- Communication between clusters
+
+**Solutions**:
+- Model spatial correlation
+- Increase buffer between clusters
+- Account for cluster relationships
+
+#### 4. Correct Cluster Membership
+
+**Critical**: Individuals must be correctly assigned to clusters
+
+**Check**:
+```typescript
+// Verify cluster assignments
+function validateClusterAssignment(data: SteppedWedgeData[]): void {
+  const clusterSizes = new Map<string, number>();
+
+  data.forEach(row => {
+    const count = clusterSizes.get(row.clusterId) || 0;
+    clusterSizes.set(row.clusterId, count + 1);
+  });
+
+  clusterSizes.forEach((size, clusterId) => {
+    if (size < 10) {
+      console.warn(`⚠️  Cluster ${clusterId} has only ${size} observations`);
+    }
+  });
+}
+```
+
+### Sample Size and Power
+
+**Design Effect**:
+```
+DE = 1 + (m - 1) × ICC
+
+Where:
+  m = average cluster size
+  ICC = intracluster correlation
+```
+
+**Effective Sample Size**:
+```
+n_effective = n_actual / DE
+```
+
+**Example**:
+```typescript
+const totalIndividuals = 2000;
+const numClusters = 20;
+const clusterSize = totalIndividuals / numClusters;  // 100
+const icc = 0.05;
+
+const designEffect = 1 + (clusterSize - 1) * icc;
+// DE = 1 + 99 × 0.05 = 5.95
+
+const effectiveSampleSize = totalIndividuals / designEffect;
+// n_eff = 2000 / 5.95 = 336
+
+console.log(`Actual n: ${totalIndividuals}`);
+console.log(`Effective n: ${Math.round(effectiveSampleSize)}`);
+console.log(`Power loss: ${(1 - effectiveSampleSize/totalIndividuals) * 100}%`);
+// Power loss: 83% due to clustering!
+```
+
+**Implication**: Clustering dramatically reduces effective sample size!
+
+**Power Calculation**:
+```typescript
+function calculateSteppedWedgePower(params: {
+  numClusters: number;
+  clusterSize: number;
+  numSteps: number;
+  icc: number;
+  effectSize: number;
+  alpha: number;
+}): number {
+  const { numClusters, clusterSize, icc, effectSize, alpha } = params;
+
+  // Design effect
+  const de = 1 + (clusterSize - 1) * icc;
+
+  // Effective sample size per cluster
+  const effClusterSize = clusterSize / de;
+
+  // Total effective sample
+  const effN = numClusters * effClusterSize;
+
+  // Standard power calculation with effective n
+  const power = calculatePowerTTest(
+    effN / 2,  // Effective n per group (simplified)
+    effectSize,
+    alpha
+  );
+
+  return power;
+}
+
+// Example
+const power = calculateSteppedWedgePower({
+  numClusters: 20,
+  clusterSize: 100,
+  numSteps: 5,
+  icc: 0.05,
+  effectSize: 0.5,  // Cohen's d
+  alpha: 0.05
+});
+
+console.log(`Power: ${(power * 100).toFixed(1)}%`);
+```
+
+### Comparison to Other Designs
+
+#### vs. Parallel Cluster-Randomized Trial
+
+**Parallel**:
+```
+Cluster 1: C C C C C
+Cluster 2: C C C C C
+Cluster 3: T T T T T
+Cluster 4: T T T T T
+```
+
+**Stepped Wedge**:
+```
+Cluster 1: C C T T T
+Cluster 2: C T T T T
+Cluster 3: C C C T T
+Cluster 4: C C C C T
+```
+
+**Comparison**:
+
+| Aspect | Parallel | Stepped Wedge |
+|--------|----------|---------------|
+| All receive treatment? | No | Yes |
+| Controls time trends? | No | Yes |
+| Power | Higher | Lower |
+| Ethical | Less acceptable | More acceptable |
+| Analysis complexity | Simpler | More complex |
+| Duration | Shorter | Longer |
+
+#### vs. Crossover Design
+
+**Crossover**:
+```
+Cluster 1: C T C T
+Cluster 2: T C T C
+```
+
+**Stepped Wedge**:
+```
+Cluster 1: C C T T
+Cluster 2: C T T T
+```
+
+**Key Differences**:
+- Crossover: Bidirectional, requires washout
+- Stepped wedge: Unidirectional, no washout needed
+- Stepped wedge: Better for interventions that can't be withdrawn
+
+### Practical Implementation
+
+#### Data Structure
+
+```typescript
+interface SteppedWedgeDataPoint {
+  clusterId: string;
+  individualId: string;
+  step: number;           // Time period (0, 1, 2, ...)
+  treatment: 0 | 1;       // 0 = control, 1 = treatment
+  outcome: number;        // Measured outcome
+  covariates?: {          // Optional individual-level covariates
+    age?: number;
+    gender?: string;
+    baseline?: number;
+  };
+}
+
+// Example data
+const data: SteppedWedgeDataPoint[] = [
+  {
+    clusterId: 'hospital-1',
+    individualId: 'patient-001',
+    step: 0,
+    treatment: 0,  // In control at step 0
+    outcome: 82.5,
+    covariates: { age: 45, gender: 'F' }
+  },
+  {
+    clusterId: 'hospital-1',
+    individualId: 'patient-002',
+    step: 2,
+    treatment: 1,  // Switched to treatment at step 2
+    outcome: 88.3,
+    covariates: { age: 52, gender: 'M' }
+  },
+  // ... more data points
+];
+```
+
+#### Analysis Workflow
+
+```typescript
+async function analyzeSteppedWedge(
+  experimentId: string
+): Promise<SteppedWedgeAnalysisResult> {
+  // 1. Load and validate data
+  const data = await loadExperimentData(experimentId);
+  validateSteppedWedgeData(data);
+
+  // 2. Fit mixed effects model
+  const model = await fitMixedEffectsModel({
+    formula: 'outcome ~ step + treatment + (1 | clusterId)',
+    data,
+    method: 'REML'  // Restricted Maximum Likelihood
+  });
+
+  // 3. Extract treatment effect
+  const treatmentEffect = model.coefficients.treatment;
+
+  // 4. Calculate ICC
+  const betweenVar = model.randomEffects.variance;
+  const withinVar = model.residualVariance;
+  const icc = betweenVar / (betweenVar + withinVar);
+
+  // 5. Check assumptions
+  const assumptions = {
+    normalityOfResiduals: checkNormality(model.residuals),
+    homoscedasticity: checkHomoscedasticity(model),
+    warnings: []
+  };
+
+  if (icc > 0.15) {
+    assumptions.warnings.push('High ICC detected - clustering effect is substantial');
+  }
+
+  // 6. Return results
+  return {
+    treatmentEffect: {
+      estimate: treatmentEffect.estimate,
+      standardError: treatmentEffect.se,
+      pValue: treatmentEffect.pValue,
+      confidenceInterval: treatmentEffect.ci
+    },
+    timeEffect: {
+      estimate: model.coefficients.step.estimate,
+      standardError: model.coefficients.step.se,
+      pValue: model.coefficients.step.pValue
+    },
+    intraclusterCorrelation: icc,
+    clusterEffects: model.randomEffects.clusters,
+    modelFit: {
+      aic: model.aic,
+      bic: model.bic,
+      logLikelihood: model.logLikelihood
+    },
+    assumptions
+  };
+}
+```
+
+### Reporting Results
+
+**Template**:
+
+```markdown
+## Stepped Wedge Analysis Results
+
+### Design
+- **Number of clusters**: 20 hospitals
+- **Number of steps**: 5 (plus baseline)
+- **Step duration**: 1 week
+- **Total duration**: 6 weeks
+- **Sample size**: 2,847 patients
+
+### Model
+Mixed effects model with cluster random intercepts and time adjustment:
+Y_ij = β₀ + β₁(time) + β₂(treatment) + u_i + ε_ij
+
+### Treatment Effect
+**Primary finding**: Treatment increased hand hygiene compliance by 3.2 percentage points
+- Point estimate: 3.2% [95% CI: 1.8%, 4.6%]
+- P-value: < 0.001
+- Effect size: Cohen's d = 0.42 (medium)
+
+### Time Trend
+Secular trend: 0.8% increase per week (p = 0.023)
+This represents natural improvement independent of treatment.
+
+### Clustering
+- **ICC**: 0.048 (4.8%)
+- **Interpretation**: 4.8% of variance due to hospital-level factors
+- **Design effect**: 5.7
+- **Effective sample size**: 500 (vs. 2,847 actual)
+
+### Cluster-Specific Effects
+Random intercepts (deviation from overall mean):
+- Hospital 1: +4.2% (naturally high compliance)
+- Hospital 2: -1.8%
+- Hospital 3: +2.5%
+- ... (remaining hospitals)
+
+### Assumptions
+✅ Residuals approximately normal (Shapiro-Wilk p = 0.18)
+✅ Homoscedasticity acceptable (Breusch-Pagan p = 0.12)
+✅ No extreme outliers detected
+⚠️  Moderate ICC (5%) accounted for in model
+
+### Conclusion
+The treatment significantly improved hand hygiene compliance by 3.2% after
+accounting for secular time trends and hospital-level clustering. The effect
+is consistent across hospitals and time periods.
+```
+
+### Common Diagnostic Issues
+
+#### Issue 1: Very High ICC
+
+**Problem**:
+```typescript
+const icc = 0.25;  // 25% - very high!
+```
+
+**Implications**:
+- Large clustering effect
+- Much of variance is between clusters
+- Need many more clusters for adequate power
+
+**Solutions**:
+- Recruit more clusters
+- Use cluster-level covariates to explain variance
+- Consider if stepped wedge is appropriate design
+
+#### Issue 2: Imbalanced Clusters
+
+**Problem**:
+```
+Cluster 1: n = 250
+Cluster 2: n = 45   ← Small
+Cluster 3: n = 180
+Cluster 4: n = 320
+```
+
+**Solutions**:
+- Weight analysis by cluster size
+- Use mixed models (handles imbalance naturally)
+- Investigate why imbalance occurred
+
+#### Issue 3: Strong Time Trends
+
+**Problem**:
+```typescript
+const timeEffect = 2.5;  // β₁ = 2.5% per step
+const treatmentEffect = 1.2;  // β₂ = 1.2%
+
+// Time trend is larger than treatment effect!
+```
+
+**Implications**:
+- Hard to separate treatment from trend
+- May need longer baseline period
+- Consider if stepped wedge is confounded
+
+**Solutions**:
+- Extend baseline period (more pure control data)
+- Model non-linear time trends
+- Use more frequent measurements
+
+---
+
 ## Summary
 
 This guide covered:
@@ -1976,6 +2562,7 @@ This guide covered:
 6. ✅ **Bayesian Methods**: When and how to use Bayesian analysis
 7. ✅ **Sequential Testing**: Early stopping with alpha spending
 8. ✅ **CUPED**: Variance reduction for increased power
+9. ✅ **Stepped Wedge**: Mixed effects models, ICC, cluster analysis, and time trends
 
 ## Additional Resources
 

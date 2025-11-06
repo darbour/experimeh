@@ -337,6 +337,92 @@ export interface SwitchbackAnalysisResult {
 }
 
 /**
+ * Effect estimate with statistical measures
+ *
+ * Generic structure for representing an estimated effect from a model,
+ * including the point estimate, uncertainty measures, and significance.
+ */
+export interface EffectEstimate {
+  /** Point estimate of the effect */
+  estimate: number;
+  /** Standard error of the estimate */
+  standardError: number;
+  /** Confidence interval for the estimate */
+  confidenceInterval: ConfidenceInterval;
+  /** P-value for hypothesis test */
+  pValue: number;
+  /** Significance level */
+  significance: SignificanceLevel;
+  /** Test statistic (e.g., t-statistic, z-statistic) */
+  testStatistic: number;
+}
+
+/**
+ * Random effect for a single cluster
+ *
+ * Captures the cluster-specific deviation from the overall mean,
+ * along with descriptive statistics for that cluster.
+ */
+export interface ClusterEffect {
+  /** Cluster identifier */
+  clusterId: string;
+  /** Random intercept for this cluster (deviation from grand mean) */
+  randomIntercept: number;
+  /** Number of observations in this cluster */
+  sampleSize: number;
+  /** Mean outcome value for this cluster */
+  meanOutcome: number;
+}
+
+/**
+ * Stepped wedge analysis result
+ *
+ * Analysis for stepped wedge cluster randomized trials using mixed-effects
+ * regression models. Accounts for clustering, temporal trends, and the
+ * sequential rollout of treatment across clusters.
+ */
+export interface SteppedWedgeAnalysisResult {
+  /** Type identifier for stepped wedge analysis */
+  type: 'stepped_wedge';
+  /** Treatment effect estimate (β_treatment) - primary parameter of interest */
+  treatmentEffect: EffectEstimate;
+  /** Time/step effect estimate (β_time) - captures secular trends */
+  timeEffect: EffectEstimate;
+  /** Intracluster correlation coefficient (ICC) - proportion of variance due to clustering */
+  intraclusterCorrelation: number;
+  /** Random effects for each cluster */
+  clusterEffects: ClusterEffect[];
+  /** Model fit statistics */
+  modelFit: {
+    /** Akaike Information Criterion */
+    aic: number;
+    /** Bayesian Information Criterion */
+    bic: number;
+    /** Log-likelihood of the fitted model */
+    logLikelihood: number;
+  };
+  /** Validation of model assumptions */
+  assumptions: {
+    /** Whether residuals appear normally distributed */
+    normalityOfResiduals: boolean;
+    /** Whether variance is constant across groups/time */
+    homoscedasticity: boolean;
+    /** Whether temporal autocorrelation was detected */
+    temporalAutocorrelation?: {
+      detected: boolean;
+      lag1Correlation: number;
+    };
+    /** Any assumption violations or concerns */
+    issues: Array<{
+      assumption: string;
+      violated: boolean;
+      severity: 'warning' | 'error';
+      message: string;
+    }>;
+  };
+}
+
+/**
  * Multiple testing correction result
  */
 export interface MultipleTestingCorrection {
@@ -427,7 +513,8 @@ export interface ExperimentAnalysisResult {
   designAnalysis?:
     | { type: 'factorial'; result: FactorialAnalysisResult }
     | { type: 'within_subjects'; result: WithinSubjectsAnalysisResult }
-    | { type: 'switchback'; result: SwitchbackAnalysisResult };
+    | { type: 'switchback'; result: SwitchbackAnalysisResult }
+    | { type: 'stepped_wedge'; result: SteppedWedgeAnalysisResult };
 
   /** Power analysis */
   powerAnalysis: PowerAnalysisResult;
@@ -603,6 +690,15 @@ export function isSwitchbackAnalysis(
   analysis: ExperimentAnalysisResult['designAnalysis']
 ): analysis is { type: 'switchback'; result: SwitchbackAnalysisResult } {
   return analysis?.type === 'switchback';
+}
+
+/**
+ * Type guard for stepped wedge analysis
+ */
+export function isSteppedWedgeAnalysis(
+  analysis: ExperimentAnalysisResult['designAnalysis']
+): analysis is { type: 'stepped_wedge'; result: SteppedWedgeAnalysisResult } {
+  return analysis?.type === 'stepped_wedge';
 }
 
 /**

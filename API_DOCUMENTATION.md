@@ -115,6 +115,85 @@ Create a new experiment.
 }
 ```
 
+#### Stepped Wedge Experiment Example
+
+Create a stepped wedge cluster-randomized trial:
+
+```json
+{
+  "key": "hospital_protocol_rollout",
+  "name": "Hand Hygiene Protocol Rollout",
+  "description": "Rolling out enhanced hand hygiene protocol across hospital units",
+  "designType": "stepped_wedge",
+  "primaryMetric": "hand_hygiene_compliance_rate",
+  "secondaryMetrics": ["healthcare_associated_infections", "staff_time_spent"],
+  "guardrailMetrics": ["patient_satisfaction", "workflow_disruption"],
+  "randomizationUnit": "other",
+  "assignmentKey": "hospital_unit_id",
+  "variants": [
+    {
+      "key": "control",
+      "name": "Standard Protocol",
+      "description": "Existing hand hygiene protocol",
+      "allocation": 50
+    },
+    {
+      "key": "treatment",
+      "name": "Enhanced Protocol",
+      "description": "New enhanced hand hygiene protocol with real-time feedback",
+      "allocation": 50
+    }
+  ],
+  "designConfig": {
+    "type": "stepped_wedge",
+    "numSteps": 5,
+    "stepDurationMinutes": 10080,
+    "clusterKey": "hospital_unit_id",
+    "numClusters": 20,
+    "schedule": {
+      "clusterToStep": {
+        "unit-1": 1,
+        "unit-2": 1,
+        "unit-3": 1,
+        "unit-4": 1,
+        "unit-5": 2,
+        "unit-6": 2,
+        "unit-7": 2,
+        "unit-8": 2,
+        "unit-9": 3,
+        "unit-10": 3,
+        "unit-11": 3,
+        "unit-12": 3,
+        "unit-13": 4,
+        "unit-14": 4,
+        "unit-15": 4,
+        "unit-16": 4,
+        "unit-17": 5,
+        "unit-18": 5,
+        "unit-19": 5,
+        "unit-20": 5
+      }
+    }
+  },
+  "trafficAllocation": 100,
+  "minSampleSize": 2000
+}
+```
+
+**Required Fields for Stepped Wedge**:
+- `designType`: Must be "stepped_wedge"
+- `designConfig.numSteps`: Number of time steps (excluding baseline step 0)
+- `designConfig.stepDurationMinutes`: Duration of each step in minutes
+- `designConfig.clusterKey`: Field name in context that identifies the cluster
+- `designConfig.numClusters`: Total number of clusters
+- `designConfig.schedule`: Optional. If not provided, will be auto-generated with balanced randomization
+
+**Schedule Structure**:
+- `clusterToStep`: Maps each cluster ID to the step number when it switches from control to treatment
+- Step 0 is implicit baseline (all clusters in control)
+- Steps 1 through numSteps are when clusters progressively switch to treatment
+- Once a cluster switches, it stays in treatment (unidirectional)
+
 **Response (201 Created):**
 ```json
 {
@@ -385,6 +464,55 @@ Get experiment assignment for a unit.
   }
 }
 ```
+
+#### Stepped Wedge Assignment Example
+
+For stepped wedge experiments, the assignment depends on cluster ID and current time:
+
+**Request:**
+```
+GET /api/v1/assignments?unitId=patient123&experimentKey=hospital_protocol_rollout&context[hospital_unit_id]=unit-5
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "unitId": "patient123",
+    "context": {
+      "hospital_unit_id": "unit-5"
+    },
+    "assignments": {
+      "hospital_protocol_rollout": {
+        "experimentId": "exp-456",
+        "variantKey": "treatment",
+        "assigned": true,
+        "reason": "stepped_wedge_step_3_cluster_unit-5",
+        "steppedWedgeMetadata": {
+          "currentStep": 3,
+          "stepStart": "2025-11-20T00:00:00Z",
+          "stepEnd": "2025-11-27T00:00:00Z",
+          "clusterId": "unit-5",
+          "switchStep": 2,
+          "inTreatment": true,
+          "totalSteps": 5,
+          "stepDurationMinutes": 10080
+        }
+      }
+    },
+    "timestamp": "2025-11-22T10:00:00Z"
+  }
+}
+```
+
+**Response Fields for Stepped Wedge**:
+- `variantKey`: "control" if currentStep < switchStep, "treatment" otherwise
+- `steppedWedgeMetadata.currentStep`: Current time step (0-based)
+- `steppedWedgeMetadata.switchStep`: Step when this cluster switches to treatment
+- `steppedWedgeMetadata.inTreatment`: Boolean indicating if cluster has switched
+- `steppedWedgeMetadata.clusterId`: Cluster this unit belongs to
+- `steppedWedgeMetadata.stepStart/stepEnd`: Boundaries of current step
 
 ### Bulk Assignment
 

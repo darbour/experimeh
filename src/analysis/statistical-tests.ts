@@ -126,10 +126,11 @@ function variance(values: number[], sampleMean?: number): number {
 
 /**
  * Calculate standard deviation
+ * @deprecated Use variance with sqrt instead
  */
-function stdDev(values: number[], sampleMean?: number): number {
-  return Math.sqrt(variance(values, sampleMean));
-}
+// function _stdDev(values: number[], sampleMean?: number): number {
+//   return Math.sqrt(variance(values, sampleMean));
+// }
 
 /**
  * Standard normal CDF (approximation using Abramowitz and Stegun formula)
@@ -200,11 +201,11 @@ function chiSquareCDF(x: number, df: number): number {
 /**
  * F-distribution CDF approximation
  */
-function fCDF(f: number, df1: number, df2: number): number {
+function fCDF(f: number, df1: number, _df2: number): number {
   if (f <= 0) return 0;
 
   // Beta distribution transformation
-  const x = (df2) / (df2 + df1 * f);
+  // const x = (_df2) / (_df2 + df1 * f);
 
   // For simplicity, use chi-square approximation
   // More accurate methods exist but are complex
@@ -803,7 +804,7 @@ export function multipleRegression(
   y: number[],
   X: number[][],
   variableNames: string[],
-  alpha: number = 0.05
+  _alpha: number = 0.05
 ): RegressionResult {
   const n = y.length;
   const p = X[0].length; // Number of predictors

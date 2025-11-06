@@ -121,6 +121,107 @@ class DefaultAssignmentAlgorithm implements IAssignmentAlgorithm {
     const variantIndex = (startPosition + sessionNumber) % numVariants;
     return variants[variantIndex].key;
   }
+
+  /**
+   * Stepped wedge assignment
+   * Cluster-level unidirectional switching from control to treatment
+   */
+  assignSteppedWedge(experiment: Experiment, clusterId: string, timestamp: Date): {
+    variantKey: string;
+    currentStep: number;
+    stepStart: Date;
+    stepEnd: Date;
+    switchStep: number;
+    inTreatment: boolean;
+  } {
+    if (!experiment.startDate) {
+      throw new AssignmentError('Stepped wedge requires experiment startDate');
+    }
+
+    const config = experiment.designConfig;
+    if (!config?.numSteps || !config?.stepDurationMinutes) {
+      throw new AssignmentError('Stepped wedge requires numSteps and stepDurationMinutes');
+    }
+
+    // Calculate current step
+    const startTime = experiment.startDate.getTime();
+    const currentTime = timestamp.getTime();
+    const elapsedMinutes = (currentTime - startTime) / (1000 * 60);
+    const currentStep = Math.max(0, Math.floor(elapsedMinutes / config.stepDurationMinutes));
+
+    // Calculate step boundaries
+    const stepStart = new Date(startTime + currentStep * config.stepDurationMinutes * 60 * 1000);
+    const stepEnd = new Date(startTime + (currentStep + 1) * config.stepDurationMinutes * 60 * 1000);
+
+    // Generate or use existing schedule
+    const schedule = config.schedule || this.generateSteppedWedgeSchedule(
+      config.numClusters || 0,
+      config.numSteps,
+      experiment.id
+    );
+
+    // Get switch step for this cluster
+    const switchStep = schedule.clusterToStep[clusterId];
+    if (switchStep === undefined) {
+      throw new AssignmentError(`Cluster ${clusterId} not found in schedule`);
+    }
+
+    // Determine assignment
+    const inTreatment = currentStep >= switchStep;
+    const variantKey = inTreatment ? 'treatment' : 'control';
+
+    return {
+      variantKey,
+      currentStep,
+      stepStart,
+      stepEnd,
+      switchStep,
+      inTreatment,
+    };
+  }
+
+  /**
+   * Generate stepped wedge schedule
+   */
+  private generateSteppedWedgeSchedule(
+    numClusters: number,
+    numSteps: number,
+    seed: string
+  ): { clusterToStep: Record<string, number>; stepToClusters: Record<number, string[]>; seed: string } {
+    const clusterIds = Array.from({ length: numClusters }, (_, i) => `cluster-${i + 1}`);
+    const shuffled = this.shuffleArray(clusterIds, seed);
+
+    const clustersPerStep = Math.ceil(numClusters / numSteps);
+    const clusterToStep: Record<string, number> = {};
+    const stepToClusters: Record<number, string[]> = {};
+
+    shuffled.forEach((clusterId, index) => {
+      const switchStep = Math.floor(index / clustersPerStep) + 1;
+      const cappedStep = Math.min(switchStep, numSteps);
+
+      if (!stepToClusters[cappedStep]) {
+        stepToClusters[cappedStep] = [];
+      }
+      stepToClusters[cappedStep].push(clusterId);
+      clusterToStep[clusterId] = cappedStep;
+    });
+
+    return { clusterToStep, stepToClusters, seed };
+  }
+
+  /**
+   * Deterministic shuffle based on seed
+   */
+  private shuffleArray<T>(array: T[], seed: string): T[] {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const hashInput = `${seed}:shuffle:${i}`;
+      const hashValue = this.hash(hashInput);
+      const j = hashValue % (i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
 }
 
 export class AssignmentService {
@@ -152,15 +253,7 @@ export class AssignmentService {
     this.logger.debug('Getting assignment', { experimentKey, unitId });
 
     try {
-      // Try cache first
-      const cacheKey = `assignment:${experimentKey}:${unitId}`;
-      const cached = await this.cache.get<AssignmentResult>(cacheKey);
-      if (cached) {
-        this.logger.debug('Assignment found in cache', { experimentKey, unitId });
-        return cached;
-      }
-
-      // Get experiment configuration
+      // Get experiment configuration first to determine cache key strategy
       const experiment = await this.configService.getExperimentByKey(experimentKey);
       if (!experiment) {
         this.logger.warn('Experiment not found', { experimentKey });
@@ -169,6 +262,26 @@ export class AssignmentService {
           assigned: false,
           reason: 'experiment_not_found',
         };
+      }
+
+      // Build cache key based on experiment type
+      let cacheKey = `assignment:${experimentKey}:${unitId}`;
+
+      // For stepped wedge, include cluster ID and current step in cache key
+      if (experiment.designType === 'stepped_wedge' && experiment.designConfig?.clusterKey) {
+        const clusterId = context.attributes?.[experiment.designConfig.clusterKey];
+        if (clusterId && experiment.startDate && experiment.designConfig?.stepDurationMinutes) {
+          const elapsedMinutes = (Date.now() - experiment.startDate.getTime()) / (1000 * 60);
+          const currentStep = Math.max(0, Math.floor(elapsedMinutes / experiment.designConfig.stepDurationMinutes));
+          cacheKey = `assignment:${experimentKey}:${clusterId}:step:${currentStep}`;
+        }
+      }
+
+      // Try cache first
+      const cached = await this.cache.get<AssignmentResult>(cacheKey);
+      if (cached) {
+        this.logger.debug('Assignment found in cache', { experimentKey, unitId, cacheKey });
+        return cached;
       }
 
       // Check if experiment is running
@@ -359,6 +472,40 @@ export class AssignmentService {
           reason: 'assigned',
         };
 
+      case 'stepped_wedge':
+        // For stepped wedge, extract cluster ID from context
+        const swConfig = experiment.designConfig;
+        if (!swConfig?.clusterKey) {
+          throw new AssignmentError('Stepped wedge requires clusterKey in designConfig');
+        }
+
+        const clusterId = context.attributes?.[swConfig.clusterKey];
+        if (!clusterId) {
+          throw new AssignmentError(
+            `Cluster key '${swConfig.clusterKey}' not found in context attributes. ` +
+            `Available attributes: ${Object.keys(context.attributes || {}).join(', ')}`
+          );
+        }
+
+        const swTimestamp = context.timestamp || new Date();
+        const steppedWedgeAssignment = this.algorithm.assignSteppedWedge(
+          experiment,
+          clusterId,
+          swTimestamp
+        );
+
+        return {
+          variantKey: steppedWedgeAssignment.variantKey,
+          assigned: true,
+          reason: 'assigned',
+          currentStep: steppedWedgeAssignment.currentStep,
+          stepStart: steppedWedgeAssignment.stepStart,
+          stepEnd: steppedWedgeAssignment.stepEnd,
+          switchStep: steppedWedgeAssignment.switchStep,
+          inTreatment: steppedWedgeAssignment.inTreatment,
+          clusterId: clusterId,
+        };
+
       default:
         throw new AssignmentError(`Unsupported experiment type: ${experiment.designType}`);
     }
@@ -432,7 +579,13 @@ export class AssignmentService {
     assignment: AssignmentResult
   ): Promise<void> {
     try {
-      const cacheKey = `assignment:${experimentKey}:${unitId}`;
+      let cacheKey = `assignment:${experimentKey}:${unitId}`;
+
+      // For stepped wedge, use cluster and step-based caching
+      if (assignment.clusterId && assignment.currentStep !== undefined) {
+        cacheKey = `assignment:${experimentKey}:${assignment.clusterId}:step:${assignment.currentStep}`;
+      }
+
       await this.cache.set(cacheKey, assignment, this.assignmentCacheTtlSeconds);
     } catch (error) {
       this.logger.warn('Failed to cache assignment', { error, experimentKey, unitId });

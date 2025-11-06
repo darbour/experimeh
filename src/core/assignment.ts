@@ -20,12 +20,11 @@
  */
 
 import {
-  hashExperiment,
   hashExperimentFloat,
   hashFactorialFactor,
   hashSwitchbackPeriod,
   hashWithinSubjects,
-  hashToRange,
+  murmurHash3,
 } from './hash';
 
 /**
@@ -50,8 +49,8 @@ export interface ExperimentConfig {
   key: string;
   variants: Variant[];
   trafficAllocation: number; // Percentage 0-100 of total traffic
-  designType: 'ab' | 'multivariate' | 'factorial' | 'within_subjects' | 'switchback';
-  designConfig?: FactorialConfig | WithinSubjectsConfig | SwitchbackConfig;
+  designType: 'ab' | 'multivariate' | 'factorial' | 'within_subjects' | 'switchback' | 'stepped_wedge';
+  designConfig?: FactorialConfig | WithinSubjectsConfig | SwitchbackConfig | SteppedWedgeConfig;
   randomizationUnit: 'user' | 'session' | 'device' | 'other';
   startDate: Date;
   endDate?: Date;
@@ -69,6 +68,21 @@ export interface WithinSubjectsConfig {
 export interface SwitchbackConfig {
   periodMinutes: number; // Length of each period
   washoutMinutes?: number; // Optional cooldown between switches
+}
+
+export interface SteppedWedgeConfig {
+  numSteps: number; // Number of time steps (periods) excluding baseline
+  stepDurationMinutes: number; // Duration of each step in minutes
+  numClusters: number; // Total number of clusters
+  clusterKey: string; // Key to extract cluster ID from context (e.g., 'hospital_id')
+  schedule?: SteppedWedgeSchedule; // Pre-defined schedule or auto-generated
+  clusterIds?: string[]; // Optional predefined cluster IDs
+}
+
+export interface SteppedWedgeSchedule {
+  stepToClusters: Record<number, string[]>; // Map of step number → cluster IDs that switch
+  clusterToStep: Record<string, number>; // Map of cluster ID → step when it switches
+  seed: string; // Randomization seed for reproducibility
 }
 
 export interface AssignmentResult {
@@ -91,6 +105,15 @@ export interface SwitchbackAssignmentResult extends AssignmentResult {
   periodNumber: number;
   periodStart: Date;
   periodEnd: Date;
+}
+
+export interface SteppedWedgeAssignmentResult extends AssignmentResult {
+  currentStep: number; // Current step number (0-indexed)
+  stepStart: Date; // Start time of current step
+  stepEnd: Date; // End time of current step
+  clusterId: string; // ID of the cluster being assigned
+  switchStep: number; // Step at which this cluster switches to treatment
+  inTreatment: boolean; // True if currentStep >= switchStep
 }
 
 /**
@@ -548,6 +571,307 @@ function generateRandomOrder(
 }
 
 /**
+ * Deterministic shuffle using Fisher-Yates with hash-based seeding
+ * Provides reproducible randomization for stepped wedge cluster assignment
+ *
+ * Algorithm:
+ * 1. Use seed to generate initial hash value
+ * 2. For each position from end to start:
+ *    - Generate hash for this iteration
+ *    - Use hash modulo to select swap position
+ *    - Swap elements
+ *
+ * Time Complexity: O(n) where n = array length
+ * Space Complexity: O(n) for array copy
+ *
+ * Statistical Properties:
+ * - Deterministic: Same seed always produces same permutation
+ * - Uniform: All permutations equally likely (given uniform hash)
+ * - Independent: Different seeds produce independent permutations
+ *
+ * @param array - Array to shuffle
+ * @param seed - Seed string for deterministic randomization
+ * @returns New shuffled array (original unchanged)
+ *
+ * @example
+ * ```typescript
+ * const clusters = ['A', 'B', 'C', 'D'];
+ * const shuffled = shuffleWithSeed(clusters, 'exp-123');
+ * // Always produces same order for same seed
+ * ```
+ */
+export function shuffleWithSeed<T>(array: T[], seed: string): T[] {
+  const arr = [...array];
+
+  // Fisher-Yates shuffle with deterministic hash-based random
+  for (let i = arr.length - 1; i > 0; i--) {
+    // Generate deterministic "random" value for this iteration
+    const iterationSeed = `${seed}:shuffle:${i}`;
+    const hash = murmurHash3(iterationSeed);
+    const j = hash % (i + 1);
+
+    // Swap elements
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
+}
+
+/**
+ * Generate Stepped Wedge Switching Schedule
+ * Creates deterministic cluster-to-step assignment with balanced distribution
+ *
+ * Algorithm:
+ * 1. Create or use provided cluster IDs
+ * 2. Shuffle clusters deterministically using seed
+ * 3. Distribute shuffled clusters evenly across steps
+ * 4. Build bidirectional lookup maps
+ *
+ * Time Complexity: O(c) where c = number of clusters
+ * Space Complexity: O(c)
+ *
+ * Statistical Properties:
+ * - Randomized cluster order (deterministic with seed)
+ * - Balanced distribution: clusters per step differ by at most 1
+ * - No bias in which clusters switch early vs late
+ *
+ * Distribution Strategy:
+ * - Step 0: All clusters in control (baseline)
+ * - Steps 1 to numSteps: Clusters switch progressively
+ * - Even distribution: floor(c/s) or ceil(c/s) per step
+ *
+ * @param numClusters - Total number of clusters
+ * @param numSteps - Number of switching steps (excluding baseline)
+ * @param seed - Randomization seed for reproducibility
+ * @param clusterIds - Optional predefined cluster IDs (generated if not provided)
+ * @returns Schedule with cluster-to-step mappings
+ *
+ * @example
+ * ```typescript
+ * const schedule = generateSteppedWedgeSchedule(10, 4, 'exp-123');
+ * // schedule.clusterToStep might be:
+ * // { 'cluster-1': 1, 'cluster-2': 1, 'cluster-3': 2, ... }
+ * // With ~2-3 clusters switching at each step
+ * ```
+ */
+export function generateSteppedWedgeSchedule(
+  numClusters: number,
+  numSteps: number,
+  seed: string,
+  clusterIds?: string[]
+): SteppedWedgeSchedule {
+  if (numClusters <= 0) {
+    throw new Error('numClusters must be positive');
+  }
+  if (numSteps <= 0) {
+    throw new Error('numSteps must be positive');
+  }
+  if (numSteps > numClusters) {
+    throw new Error('numSteps cannot exceed numClusters (need at least 1 cluster per step)');
+  }
+
+  // Create cluster IDs if not provided
+  const clusters = clusterIds || Array.from(
+    { length: numClusters },
+    (_, i) => `cluster-${i + 1}`
+  );
+
+  if (clusters.length !== numClusters) {
+    throw new Error(`Provided clusterIds length (${clusters.length}) does not match numClusters (${numClusters})`);
+  }
+
+  // Shuffle clusters deterministically using seed
+  const shuffledClusters = shuffleWithSeed(clusters, seed);
+
+  // Calculate balanced distribution
+  const clustersPerStep = Math.ceil(numClusters / numSteps);
+
+  const stepToClusters: Record<number, string[]> = {};
+  const clusterToStep: Record<string, number> = {};
+
+  // Distribute clusters across steps
+  shuffledClusters.forEach((clusterId, index) => {
+    // Step 0 is baseline (all control), switching starts at step 1
+    const switchStep = Math.floor(index / clustersPerStep) + 1;
+    // Cap at numSteps to handle rounding
+    const cappedStep = Math.min(switchStep, numSteps);
+
+    // Add to stepToClusters map
+    if (!stepToClusters[cappedStep]) {
+      stepToClusters[cappedStep] = [];
+    }
+    stepToClusters[cappedStep].push(clusterId);
+
+    // Add to clusterToStep map
+    clusterToStep[clusterId] = cappedStep;
+  });
+
+  return {
+    stepToClusters,
+    clusterToStep,
+    seed,
+  };
+}
+
+/**
+ * Stepped Wedge Design Assignment
+ * Cluster-level randomized trial with unidirectional switching from control to treatment
+ *
+ * Algorithm:
+ * 1. Calculate current step from elapsed time since experiment start
+ * 2. Determine cluster ID from context (or use provided clusterId)
+ * 3. Look up when this cluster switches from schedule
+ * 4. Assign control if currentStep < switchStep, treatment otherwise
+ * 5. Return full metadata including step boundaries and cluster info
+ *
+ * Time Complexity: O(1) - constant time assignment via hash lookups
+ * Space Complexity: O(1)
+ *
+ * Statistical Properties:
+ * - Cluster-randomized: Randomization at cluster level, not individual
+ * - Within-cluster correlation: Units in same cluster have correlated outcomes
+ * - Unidirectional: Once switched to treatment, stays in treatment
+ * - Time trends: Design controls for secular trends via stepped rollout
+ * - Complete rollout: All clusters eventually receive treatment
+ *
+ * Design Structure:
+ * - Step 0: All clusters in control (baseline period)
+ * - Steps 1 to N: Clusters progressively switch to treatment
+ * - No cluster ever switches back to control
+ *
+ * Edge Cases:
+ * - Before experiment start: Returns control with negative step metadata
+ * - After all steps complete: All clusters in treatment
+ * - Unknown cluster: Throws error (must be in schedule)
+ *
+ * Analysis Requirements:
+ * - Must account for clustering (use mixed effects or GEE)
+ * - Must adjust for time trends (step as covariate)
+ * - Cannot use simple t-test (violates independence assumption)
+ *
+ * @param experiment - Experiment with stepped wedge configuration
+ * @param clusterId - Cluster identifier (e.g., hospital ID, school ID)
+ * @param currentTime - Current timestamp for step calculation
+ * @returns Assignment with complete step and cluster metadata
+ *
+ * @throws Error if clusterId not found in schedule
+ * @throws Error if missing required stepped wedge configuration
+ *
+ * @example
+ * ```typescript
+ * const experiment = {
+ *   id: 'hospital-rollout',
+ *   designType: 'stepped_wedge',
+ *   startDate: new Date('2025-01-01'),
+ *   designConfig: {
+ *     numSteps: 4,
+ *     stepDurationMinutes: 10080, // 1 week
+ *     numClusters: 12,
+ *     clusterKey: 'hospital_id'
+ *   }
+ * };
+ *
+ * const result = assignSteppedWedge(
+ *   experiment,
+ *   'hospital-5',
+ *   new Date('2025-01-15') // Week 2
+ * );
+ * // result.currentStep = 1
+ * // result.variantKey = 'control' or 'treatment' depending on schedule
+ * ```
+ */
+export function assignSteppedWedge(
+  experiment: ExperimentConfig,
+  clusterId: string,
+  currentTime: Date = new Date()
+): SteppedWedgeAssignmentResult {
+  const config = experiment.designConfig as SteppedWedgeConfig;
+
+  // Validate configuration
+  if (!config) {
+    throw new Error('Stepped wedge experiment requires designConfig');
+  }
+  if (!config.numSteps || config.numSteps <= 0) {
+    throw new Error('Stepped wedge requires positive numSteps');
+  }
+  if (!config.stepDurationMinutes || config.stepDurationMinutes <= 0) {
+    throw new Error('Stepped wedge requires positive stepDurationMinutes');
+  }
+  if (!config.numClusters || config.numClusters <= 0) {
+    throw new Error('Stepped wedge requires positive numClusters');
+  }
+
+  // Calculate current step from elapsed time
+  const startTime = experiment.startDate.getTime();
+  const currentTimeMs = currentTime.getTime();
+  const elapsedMinutes = (currentTimeMs - startTime) / (1000 * 60);
+  const currentStep = Math.floor(elapsedMinutes / config.stepDurationMinutes);
+
+  // Clamp to valid range [0, numSteps]
+  // After numSteps, all clusters are in treatment
+  const validStep = Math.max(0, Math.min(currentStep, config.numSteps));
+
+  // Calculate step boundaries
+  const stepStart = new Date(
+    startTime + validStep * config.stepDurationMinutes * 60 * 1000
+  );
+  const stepEnd = new Date(
+    startTime + (validStep + 1) * config.stepDurationMinutes * 60 * 1000
+  );
+
+  // Generate or retrieve switching schedule
+  const schedule = config.schedule || generateSteppedWedgeSchedule(
+    config.numClusters,
+    config.numSteps,
+    experiment.id, // Use experiment ID as seed for deterministic schedule
+    config.clusterIds
+  );
+
+  // Determine when this cluster switches
+  const switchStep = schedule.clusterToStep[clusterId];
+
+  if (switchStep === undefined) {
+    throw new Error(
+      `Cluster '${clusterId}' not found in stepped wedge schedule. ` +
+      `Available clusters: ${Object.keys(schedule.clusterToStep).join(', ')}`
+    );
+  }
+
+  // Determine assignment: control if before switch, treatment after
+  const inTreatment = validStep >= switchStep;
+  const variantKey = inTreatment ? 'treatment' : 'control';
+
+  // Build reason string with detailed context
+  const reason = currentStep < 0
+    ? 'before_experiment_start'
+    : currentStep > config.numSteps
+    ? 'after_all_steps_complete'
+    : `stepped_wedge_step_${validStep}_cluster_${clusterId}_switch_${switchStep}`;
+
+  return {
+    variantKey,
+    inExperiment: currentStep >= 0, // Only in experiment if started
+    reason,
+    currentStep: validStep,
+    stepStart,
+    stepEnd,
+    clusterId,
+    switchStep,
+    inTreatment,
+    metadata: {
+      totalSteps: config.numSteps,
+      stepDurationMinutes: config.stepDurationMinutes,
+      elapsedMinutes,
+      rawStep: currentStep, // Unclamped step for debugging
+      clustersInTreatmentAtThisStep: Object.values(schedule.clusterToStep)
+        .filter(step => step <= validStep).length,
+      totalClusters: config.numClusters,
+      scheduleGenerated: !config.schedule, // Whether schedule was auto-generated
+    },
+  };
+}
+
+/**
  * Universal assignment function
  * Routes to appropriate assignment algorithm based on experiment type
  *
@@ -562,8 +886,9 @@ export function assign(
   context?: {
     currentTime?: Date;
     sessionNumber?: number;
+    clusterId?: string;
   }
-): AssignmentResult | FactorialAssignmentResult | SwitchbackAssignmentResult | WithinSubjectsAssignmentResult {
+): AssignmentResult | FactorialAssignmentResult | SwitchbackAssignmentResult | WithinSubjectsAssignmentResult | SteppedWedgeAssignmentResult {
   switch (experiment.designType) {
     case 'ab':
     case 'multivariate':
@@ -580,6 +905,12 @@ export function assign(
         throw new Error('sessionNumber required for within-subjects assignment');
       }
       return assignWithinSubjects(experiment, unitId, context.sessionNumber);
+
+    case 'stepped_wedge':
+      if (!context?.clusterId) {
+        throw new Error('clusterId required for stepped-wedge assignment');
+      }
+      return assignSteppedWedge(experiment, context.clusterId, context.currentTime);
 
     default:
       throw new Error(`Unknown experiment design type: ${experiment.designType}`);
@@ -603,6 +934,7 @@ export function batchAssign(
   context?: {
     currentTime?: Date;
     sessionNumbers?: Map<string, number>;
+    clusterIds?: Map<string, string>;
   }
 ): Map<string, AssignmentResult> {
   const results = new Map<string, AssignmentResult>();
@@ -611,6 +943,7 @@ export function batchAssign(
     const assignmentContext = {
       currentTime: context?.currentTime,
       sessionNumber: context?.sessionNumbers?.get(unitId),
+      clusterId: context?.clusterIds?.get(unitId),
     };
 
     results.set(unitId, assign(experiment, unitId, assignmentContext));
@@ -678,6 +1011,47 @@ export function validateExperiment(experiment: ExperimentConfig): string[] {
       const config = experiment.designConfig as WithinSubjectsConfig;
       if (!config?.counterbalancingScheme) {
         errors.push('Within-subjects design requires counterbalancingScheme');
+      }
+      break;
+    }
+
+    case 'stepped_wedge': {
+      const config = experiment.designConfig as SteppedWedgeConfig;
+      if (!config) {
+        errors.push('Stepped wedge design requires designConfig');
+        break;
+      }
+      if (!config.numSteps || config.numSteps <= 0) {
+        errors.push('Stepped wedge requires positive numSteps');
+      }
+      if (!config.stepDurationMinutes || config.stepDurationMinutes <= 0) {
+        errors.push('Stepped wedge requires positive stepDurationMinutes');
+      }
+      if (!config.numClusters || config.numClusters <= 0) {
+        errors.push('Stepped wedge requires positive numClusters');
+      }
+      if (!config.clusterKey) {
+        errors.push('Stepped wedge requires clusterKey');
+      }
+      if (config.numSteps > config.numClusters) {
+        errors.push('Stepped wedge numSteps cannot exceed numClusters');
+      }
+      if (config.clusterIds && config.clusterIds.length !== config.numClusters) {
+        errors.push(`Stepped wedge clusterIds length (${config.clusterIds.length}) must match numClusters (${config.numClusters})`);
+      }
+      // Validate schedule if provided
+      if (config.schedule) {
+        const schedule = config.schedule;
+        const clusterCount = Object.keys(schedule.clusterToStep).length;
+        if (clusterCount !== config.numClusters) {
+          errors.push(`Schedule contains ${clusterCount} clusters but numClusters is ${config.numClusters}`);
+        }
+        // Validate step ranges
+        for (const [clusterId, step] of Object.entries(schedule.clusterToStep)) {
+          if (step < 1 || step > config.numSteps) {
+            errors.push(`Cluster ${clusterId} assigned to invalid step ${step} (must be 1-${config.numSteps})`);
+          }
+        }
       }
       break;
     }

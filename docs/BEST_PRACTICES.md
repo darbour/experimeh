@@ -340,11 +340,76 @@ User Group 3: C → D → A → B
 User Group 4: D → A → B → C
 ```
 
+### Stepped Wedge Design
+
+**Use When**:
+- All units must eventually receive treatment (ethical requirement)
+- Rollout must be gradual (operational constraints)
+- Testing at cluster level (hospitals, schools, regions)
+- Cannot fully randomize or withhold treatment indefinitely
+- Intervention cannot be withdrawn once implemented
+- Want to control for time trends
+
+**Advantages**:
+- Ethically acceptable when denying treatment is problematic
+- All clusters receive treatment by end
+- Controls for secular time trends
+- Natural for phased rollouts
+- Provides before/after data for all clusters
+
+**Disadvantages**:
+- Requires cluster-level randomization (reduces power)
+- More complex analysis (mixed effects models)
+- Longer duration than parallel designs
+- Requires sufficient clusters (typically 12+)
+- Confounding if strong time trends exist
+- Cannot easily stop early
+
+**Example Scenarios**:
+- Healthcare: Rolling out new clinical protocol across hospital units
+- Education: Implementing new curriculum across school districts
+- Public health: Deploying intervention where everyone should benefit
+- Policy: Phased implementation of new regulations
+- Infrastructure: System upgrades that can't be easily reversed
+
+**Design Considerations**:
+```typescript
+{
+  "designType": "stepped_wedge",
+  "designConfig": {
+    "numSteps": 5,              // Number of switching periods
+    "stepDurationMinutes": 10080, // 1 week per step
+    "clusterKey": "hospital_id",  // How to identify clusters
+    "numClusters": 20            // Total clusters
+  }
+}
+```
+
+**Sample Size Considerations**:
+- Need sufficient clusters (not just individuals)
+- Account for ICC (intracluster correlation)
+- Design effect: DE = 1 + (m - 1) × ICC
+- Higher ICC requires more clusters
+- Typical: 12-20 clusters minimum
+
+**When NOT to Use**:
+- Small number of clusters (< 12)
+- Treatment can be easily randomized at individual level
+- No ethical requirement for all to receive treatment
+- Need quick results (stepped wedge takes longer)
+- Very high ICC (> 0.20) makes design inefficient
+
 ### Quick Decision Tree
 
 ```
 START: Do you have network effects or interference?
   ├─ YES → Use Switchback Design
+  └─ NO → Continue
+
+  Must all units eventually receive treatment?
+  ├─ YES → Are you rolling out across clusters?
+  │   ├─ YES → Use Stepped Wedge Design
+  │   └─ NO → Continue
   └─ NO → Continue
 
   Is this the same user over time?

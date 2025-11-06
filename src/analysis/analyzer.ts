@@ -8,6 +8,7 @@
  * - Factorial designs with interaction effects
  * - Switchback experiments with clustered errors
  * - Within-subjects (repeated measures) designs
+ * - Stepped wedge cluster randomized trials
  *
  * References:
  * - Kohavi, R., Tang, D., & Xu, Y. (2020). "Trustworthy Online Controlled Experiments"
@@ -25,6 +26,13 @@ import {
   ANOVAResult,
   RegressionResult
 } from './statistical-tests';
+
+import {
+  analyzeSteppedWedge,
+  SteppedWedgeData,
+  SteppedWedgeAnalysisResult
+} from './stepped-wedge-analysis';
+
 
 import {
   bayesianProportionTest,
@@ -66,7 +74,7 @@ import {
  * Experiment data for analysis
  */
 export interface ExperimentData {
-  design: 'ab' | 'multivariate' | 'factorial' | 'switchback' | 'within-subjects';
+  design: 'ab' | 'multivariate' | 'factorial' | 'switchback' | 'within-subjects' | 'stepped_wedge';
   metric: {
     name: string;
     type: 'continuous' | 'proportion' | 'count';
@@ -77,6 +85,8 @@ export interface ExperimentData {
     timestamp?: number[]; // For switchback
     period?: number[]; // For switchback
     subject?: (string | number)[]; // For within-subjects
+    cluster?: (string | number)[]; // For stepped wedge
+    step?: number[]; // For stepped wedge
   };
   covariates?: {
     [name: string]: number[];
@@ -87,6 +97,7 @@ export interface ExperimentData {
     baselineRate?: number; // For proportion tests
     expectedEffect?: number;
   };
+  steppedWedge?: SteppedWedgeDesign;
 }
 
 /**
@@ -100,6 +111,18 @@ export interface FactorialDesign {
   factorAssignments: {
     [factorName: string]: (string | number)[];
   };
+}
+
+/**
+ * Stepped wedge design specification
+ */
+export interface SteppedWedgeDesign {
+  /** Cluster identifiers for each observation */
+  clusters: (string | number)[];
+  /** Time step for each observation */
+  steps: number[];
+  /** Treatment status for each observation */
+  treatments: (0 | 1)[];
 }
 
 /**
@@ -241,6 +264,8 @@ export class ExperimentAnalyzer {
         return this.analyzeSwitchback(data);
       case 'within-subjects':
         return this.analyzeWithinSubjects(data);
+      case 'stepped_wedge':
+        return this.analyzeSteppedWedge(data);
       default:
         throw new Error(`Unknown design type: ${data.design}`);
     }
@@ -654,6 +679,133 @@ export class ExperimentAnalyzer {
         winner: result.significant ? variants[1] : undefined,
         effect: (result as TTestResult).mean2 - (result as TTestResult).mean1,
         confidenceInterval: result.confidenceInterval!
+      }
+    };
+  }
+
+  /**
+   * Analyze stepped wedge cluster randomized trial
+   */
+  private analyzeSteppedWedge(data: ExperimentData): AnalysisResult {
+    if (!data.assignment.cluster || !data.assignment.step) {
+      throw new Error('Stepped wedge design requires cluster and step assignments');
+    }
+
+    const warnings: string[] = [];
+    const recommendations: string[] = [];
+
+    // Convert data to SteppedWedgeData format
+    const clusterIds = Array.from(new Set(data.assignment.cluster));
+    const steppedWedgeData: SteppedWedgeData = {
+      clusters: []
+    };
+
+    // Group data by cluster and step
+    for (const clusterId of clusterIds) {
+      const clusterObservations = data.assignment.cluster
+        .map((c, i) => c === clusterId ? i : -1)
+        .filter(i => i !== -1);
+
+      const steps = Array.from(new Set(clusterObservations.map(i => data.assignment.step![i])));
+      steps.sort((a, b) => a - b);
+
+      const clusterData: any = {
+        clusterId: String(clusterId),
+        steps: []
+      };
+
+      for (const step of steps) {
+        const stepIndices = clusterObservations.filter(i => data.assignment.step![i] === step);
+        const outcomes = stepIndices.map(i => data.metric.values[i]);
+        const treatment = data.assignment.variant[stepIndices[0]];
+
+        clusterData.steps.push({
+          step,
+          treatment: treatment === 'treatment' || treatment === 1 ? 1 : 0,
+          outcomes
+        });
+      }
+
+      steppedWedgeData.clusters.push(clusterData);
+    }
+
+    // Run stepped wedge analysis
+    const swResult = analyzeSteppedWedge(steppedWedgeData, this.alpha);
+
+    // Combine warnings and recommendations
+    warnings.push(...swResult.warnings);
+    recommendations.push(...swResult.recommendations);
+
+    // Format treatment effect as primary result
+    const treatmentEffect = swResult.treatmentEffect;
+
+    // Create a TTestResult-like object for compatibility
+    const primaryResult: TTestResult = {
+      testName: 'Mixed Effects Model (Stepped Wedge)',
+      statistic: treatmentEffect.tStatistic,
+      pValue: treatmentEffect.pValue,
+      degreesOfFreedom: steppedWedgeData.clusters.length - 3,
+      confidenceInterval: treatmentEffect.confidenceInterval,
+      effectSize: treatmentEffect.cohensD,
+      significant: treatmentEffect.significant,
+      alpha: this.alpha,
+      mean1: 0, // Not directly applicable to mixed model
+      mean2: treatmentEffect.coefficient, // Treatment effect
+      variance1: swResult.icc.withinClusterVariance,
+      variance2: swResult.icc.betweenClusterVariance,
+      n1: steppedWedgeData.clusters.length,
+      n2: data.metric.values.length,
+      standardError: treatmentEffect.standardError,
+      cohensD: treatmentEffect.cohensD
+    };
+
+    // Build interpretation
+    let interpretation = `Treatment effect β₂ = ${treatmentEffect.coefficient.toFixed(4)} `;
+    interpretation += `(SE = ${treatmentEffect.standardError.toFixed(4)}, `;
+    interpretation += `p = ${treatmentEffect.pValue.toFixed(4)}). `;
+
+    if (treatmentEffect.significant) {
+      interpretation += `Statistically significant treatment effect detected after controlling for time trends and cluster effects. `;
+    } else {
+      interpretation += `No statistically significant treatment effect detected. `;
+    }
+
+    if (swResult.timeEffect.significant) {
+      interpretation += `Significant secular time trend (β₁ = ${swResult.timeEffect.coefficient.toFixed(4)}, p = ${swResult.timeEffect.pValue.toFixed(4)}). `;
+    }
+
+    interpretation += `ICC = ${swResult.icc.icc.toFixed(3)} (${swResult.icc.interpretation}).`;
+
+    // Add diagnostic information to recommendations
+    if (swResult.diagnostics.overallValid) {
+      recommendations.push('Model assumptions are satisfied. Results are reliable.');
+    }
+
+    recommendations.push(`Number of clusters: ${steppedWedgeData.clusters.length}`);
+    recommendations.push(`Number of time steps: ${Array.from(new Set(data.assignment.step)).length}`);
+    recommendations.push(`Design effect: ${swResult.icc.icc > 0 ? (1 + (data.metric.values.length / steppedWedgeData.clusters.length - 1) * swResult.icc.icc).toFixed(2) : '1.00'}`);
+
+    // Provide recommendations based on ICC
+    if (swResult.icc.icc > 0.1) {
+      recommendations.push('Consider reporting cluster-robust confidence intervals due to moderate/high ICC');
+    }
+
+    return {
+      design: 'Stepped Wedge Cluster Randomized Trial',
+      metric: data.metric.name,
+      metricType: data.metric.type,
+      primary: {
+        test: 'Mixed Effects Model (Stepped Wedge)',
+        result: primaryResult,
+        interpretation
+      },
+      warnings,
+      recommendations,
+      summary: {
+        significant: treatmentEffect.significant,
+        winner: treatmentEffect.significant && treatmentEffect.coefficient > 0 ? 'treatment' : undefined,
+        effect: treatmentEffect.coefficient,
+        confidenceInterval: treatmentEffect.confidenceInterval
       }
     };
   }

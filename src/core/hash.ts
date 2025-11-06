@@ -54,19 +54,19 @@ export function murmurHash3(key: string, seed: number = 0): number {
   // Process remaining bytes
   k1 = 0;
 
-  switch (remainder) {
-    case 3:
-      k1 ^= (key.charCodeAt(bytes + 2) & 0xff) << 16;
-      // fallthrough
-    case 2:
-      k1 ^= (key.charCodeAt(bytes + 1) & 0xff) << 8;
-      // fallthrough
-    case 1:
-      k1 ^= (key.charCodeAt(bytes) & 0xff);
-      k1 = Math.imul(k1, c1);
-      k1 = (k1 << 15) | (k1 >>> 17);
-      k1 = Math.imul(k1, c2);
-      h1 ^= k1;
+  // Intentional fallthrough for MurmurHash3 algorithm - using if/else for TS compatibility
+  if (remainder === 3) {
+    k1 ^= (key.charCodeAt(bytes + 2) & 0xff) << 16;
+  }
+  if (remainder >= 2) {
+    k1 ^= (key.charCodeAt(bytes + 1) & 0xff) << 8;
+  }
+  if (remainder >= 1) {
+    k1 ^= (key.charCodeAt(bytes) & 0xff);
+    k1 = Math.imul(k1, c1);
+    k1 = (k1 << 15) | (k1 >>> 17);
+    k1 = Math.imul(k1, c2);
+    h1 ^= k1;
   }
 
   // Finalization mix

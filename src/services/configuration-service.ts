@@ -25,11 +25,24 @@ const factorLevelSchema = Joi.object({
   levels: Joi.array().items(Joi.string()).min(2).required(),
 });
 
+const steppedWedgeScheduleSchema = Joi.object({
+  stepToClusters: Joi.object().pattern(Joi.number(), Joi.array().items(Joi.string())).required(),
+  clusterToStep: Joi.object().pattern(Joi.string(), Joi.number()).required(),
+  seed: Joi.string().required(),
+});
+
 const designConfigSchema = Joi.object({
-  type: Joi.string().valid('ab', 'multivariate', 'factorial', 'within_subjects', 'switchback').required(),
+  type: Joi.string().valid('ab', 'multivariate', 'factorial', 'within_subjects', 'switchback', 'stepped_wedge').required(),
   factors: Joi.array().items(factorLevelSchema).optional(),
   switchbackPeriodMinutes: Joi.number().positive().optional(),
   counterbalancingScheme: Joi.string().optional(),
+  // Stepped wedge fields
+  numSteps: Joi.number().positive().integer().optional(),
+  stepDurationMinutes: Joi.number().positive().optional(),
+  numClusters: Joi.number().positive().integer().optional(),
+  clusterKey: Joi.string().optional(),
+  schedule: steppedWedgeScheduleSchema.optional(),
+  permanentControlClusters: Joi.array().items(Joi.string()).optional(),
 });
 
 const experimentSchema = Joi.object({
@@ -37,7 +50,7 @@ const experimentSchema = Joi.object({
   name: Joi.string().min(1).max(255).required(),
   description: Joi.string().allow('').default(''),
   status: Joi.string().valid('draft', 'running', 'paused', 'completed').default('draft'),
-  designType: Joi.string().valid('ab', 'multivariate', 'factorial', 'within_subjects', 'switchback').required(),
+  designType: Joi.string().valid('ab', 'multivariate', 'factorial', 'within_subjects', 'switchback', 'stepped_wedge').required(),
   hypotheses: Joi.string().required(),
   primaryMetric: Joi.string().required(),
   secondaryMetrics: Joi.array().items(Joi.string()).default([]),
@@ -191,6 +204,23 @@ export class ConfigurationService {
             `Cannot modify ${attemptedChanges.join(', ')} on a running experiment`,
             { immutableFields: attemptedChanges }
           );
+        }
+
+        // For stepped wedge, prevent schedule changes on running experiments
+        if (existing.designType === 'stepped_wedge' && updates.designConfig?.schedule) {
+          throw new ConflictError(
+            'Cannot modify stepped wedge schedule on a running experiment'
+          );
+        }
+      }
+
+      // For draft stepped wedge experiments, allow schedule regeneration
+      if (existing.status === 'draft' && existing.designType === 'stepped_wedge' && updates.designConfig) {
+        const config = updates.designConfig;
+        // Regenerate schedule if numClusters or numSteps changed but no schedule provided
+        if ((config.numClusters || config.numSteps) && !config.schedule) {
+          this.logger.info('Regenerating stepped wedge schedule for draft experiment', { id });
+          // Schedule will be auto-generated during assignment
         }
       }
 
@@ -567,6 +597,43 @@ export class ConfigurationService {
       case 'multivariate':
         if (variants.length < 3) {
           throw new ValidationError('Multivariate tests must have at least 3 variants');
+        }
+        break;
+
+      case 'stepped_wedge':
+        if (!designConfig.numSteps) {
+          throw new ValidationError('Stepped wedge designs must specify numSteps');
+        }
+        if (!designConfig.stepDurationMinutes) {
+          throw new ValidationError('Stepped wedge designs must specify stepDurationMinutes');
+        }
+        if (!designConfig.clusterKey) {
+          throw new ValidationError('Stepped wedge designs must specify clusterKey');
+        }
+        if (!designConfig.numClusters && !designConfig.schedule) {
+          throw new ValidationError('Stepped wedge designs must specify numClusters or provide a schedule');
+        }
+        if (variants.length !== 2) {
+          throw new ValidationError('Stepped wedge designs must have exactly 2 variants (control and treatment)');
+        }
+        // Validate schedule if provided
+        if (designConfig.schedule) {
+          const { clusterToStep, stepToClusters } = designConfig.schedule;
+          const clusterIds = Object.keys(clusterToStep);
+          const stepValues = Object.values(clusterToStep) as number[];
+          const maxStep = Math.max(...stepValues);
+
+          if (maxStep > designConfig.numSteps) {
+            throw new ValidationError(
+              `Schedule contains step ${maxStep} which exceeds numSteps (${designConfig.numSteps})`
+            );
+          }
+
+          // Verify consistency between clusterToStep and stepToClusters
+          const clustersInSteps = Object.values(stepToClusters).flat();
+          if (clustersInSteps.length !== clusterIds.length) {
+            throw new ValidationError('Inconsistent schedule: cluster count mismatch');
+          }
         }
         break;
     }

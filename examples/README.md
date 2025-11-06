@@ -217,6 +217,32 @@ Protect against unintended negative consequences. Demonstrates:
 
 ---
 
+### 10. Stepped Wedge Design ([10-stepped-wedge-design.ts](./10-stepped-wedge-design.ts))
+
+**Difficulty:** Advanced
+**Time to read:** 30 minutes
+**Concepts:** Cluster-randomized trials, time trends, ICC, mixed-effects analysis
+
+Stepped wedge cluster-randomized trial for sequential rollout. Demonstrates:
+- Creating randomized switching schedule
+- Unidirectional treatment assignment over time
+- Visualizing rollout schedule with ASCII tables
+- Simulating cluster-level data with time trends
+- Adjusting for temporal confounding with regression
+- Calculating intraclass correlation coefficient (ICC)
+- Proper vs. naive analysis comparison
+- Design effect and power considerations
+
+**Use Case:** Rolling out hand hygiene protocol across 20 hospitals in 5 steps
+
+**Key Learning:**
+- Use stepped wedge when everyone should eventually receive treatment
+- Must adjust for both time trends AND clustering
+- Randomize ORDER of switching, not timing
+- More ethical and practical than permanent control groups
+
+---
+
 ## Running the Examples
 
 ### Prerequisites
@@ -261,6 +287,9 @@ npx ts-node examples/08-cuped-variance-reduction.ts
 
 # Guardrail metrics
 npx ts-node examples/09-guardrail-metrics.ts
+
+# Stepped wedge design
+npx ts-node examples/10-stepped-wedge-design.ts
 ```
 
 ### Running All Examples
@@ -304,6 +333,7 @@ Each example produces rich console output including:
 1. **03-switchback-experiment.ts** - Marketplace and network effects
 2. **06-advanced-targeting.ts** - Complex targeting rules
 3. **08-cuped-variance-reduction.ts** - Statistical optimization
+4. **10-stepped-wedge-design.ts** - Cluster-randomized trials with sequential rollout
 
 ## Concepts by Example
 
@@ -318,12 +348,16 @@ Each example produces rich console output including:
 - **Factorial:** 02
 - **Switchback:** 03
 - **Within-subjects:** 04
+- **Stepped wedge:** 10
 
 ### Analysis Techniques
 - **Power analysis:** 01, 07
 - **Effect size:** 02, 07
 - **Variance reduction:** 08
 - **Multiple comparisons:** 02, 07
+- **Regression adjustment:** 08, 10
+- **Cluster analysis (ICC):** 10
+- **Time trend adjustment:** 10
 
 ### Practical Considerations
 - **Feature flags:** 05

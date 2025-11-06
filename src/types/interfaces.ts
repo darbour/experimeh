@@ -146,4 +146,12 @@ export interface IAssignmentAlgorithm {
   assignFactorial(unitId: string, experiment: Experiment): Record<string, string>;
   assignSwitchback(experiment: Experiment, timestamp: Date): string;
   assignWithinSubjects(unitId: string, experiment: Experiment, sessionNumber: number): string;
+  assignSteppedWedge(experiment: Experiment, clusterId: string, timestamp: Date): {
+    variantKey: string;
+    currentStep: number;
+    stepStart: Date;
+    stepEnd: Date;
+    switchStep: number;
+    inTreatment: boolean;
+  };
 }

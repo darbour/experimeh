@@ -36,6 +36,8 @@ export enum ExperimentDesignType {
   WITHIN_SUBJECTS = 'within_subjects',
   /** Temporal switching between treatments to mitigate interference */
   SWITCHBACK = 'switchback',
+  /** Clusters switch from control to treatment sequentially over time */
+  STEPPED_WEDGE = 'stepped_wedge',
 }
 
 /**
@@ -175,6 +177,45 @@ export interface MultivariateDesignConfig {
 }
 
 /**
+ * Randomization schedule for stepped wedge design
+ *
+ * Defines when each cluster transitions from control to treatment.
+ * Clusters are randomized to steps, and all clusters eventually receive treatment
+ * (except those designated as permanent controls).
+ */
+export interface SteppedWedgeSchedule {
+  /** Mapping from step number to cluster IDs that switch at that step */
+  stepToClusters: Record<number, string[]>;
+  /** Mapping from cluster ID to the step number when it switches to treatment */
+  clusterToStep: Record<string, number>;
+  /** Randomization seed used to generate this schedule */
+  seed: string;
+}
+
+/**
+ * Configuration specific to stepped wedge designs
+ *
+ * In a stepped wedge design, clusters begin in the control condition and
+ * sequentially switch to treatment at randomly assigned time steps. This
+ * design is useful when withholding treatment is unethical or impractical,
+ * and when rolling out interventions gradually is operationally necessary.
+ */
+export interface SteppedWedgeDesignConfig {
+  /** Number of time steps in the design */
+  numSteps: number;
+  /** Duration of each step in minutes */
+  stepDurationMinutes: number;
+  /** Total number of clusters in the experiment */
+  numClusters: number;
+  /** Context key used to identify cluster membership (e.g., 'hospital_id', 'school_id') */
+  clusterKey: string;
+  /** Optional pre-generated randomization schedule */
+  schedule?: SteppedWedgeSchedule;
+  /** Optional list of cluster IDs that remain in control throughout (never switch) */
+  permanentControlClusters?: string[];
+}
+
+/**
  * Union type for all design-specific configurations
  */
 export type DesignConfig =
@@ -182,7 +223,8 @@ export type DesignConfig =
   | { type: ExperimentDesignType.MULTIVARIATE; config: MultivariateDesignConfig }
   | { type: ExperimentDesignType.FACTORIAL; config: FactorialDesignConfig }
   | { type: ExperimentDesignType.WITHIN_SUBJECTS; config: WithinSubjectsDesignConfig }
-  | { type: ExperimentDesignType.SWITCHBACK; config: SwitchbackDesignConfig };
+  | { type: ExperimentDesignType.SWITCHBACK; config: SwitchbackDesignConfig }
+  | { type: ExperimentDesignType.STEPPED_WEDGE; config: SteppedWedgeDesignConfig };
 
 /**
  * Targeting rule for experiment enrollment
@@ -429,4 +471,11 @@ export function isSwitchbackDesign(config: DesignConfig): config is { type: Expe
  */
 export function isMultivariateDesign(config: DesignConfig): config is { type: ExperimentDesignType.MULTIVARIATE; config: MultivariateDesignConfig } {
   return config.type === ExperimentDesignType.MULTIVARIATE;
+}
+
+/**
+ * Type guard to check if a design config is stepped wedge
+ */
+export function isSteppedWedgeDesign(config: DesignConfig): config is { type: ExperimentDesignType.STEPPED_WEDGE; config: SteppedWedgeDesignConfig } {
+  return config.type === ExperimentDesignType.STEPPED_WEDGE;
 }

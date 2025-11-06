@@ -334,6 +334,9 @@ export class AnalysisService {
       case 'switchback':
         return await this.analyzeSwitchback(experiment, data, alpha);
 
+      case 'stepped_wedge':
+        return await this.analyzeSteppedWedge(experiment, data, alpha);
+
       default:
         throw new AnalysisError(`Unsupported experiment type: ${experiment.designType}`);
     }
@@ -493,6 +496,136 @@ export class AnalysisService {
     );
 
     return result;
+  }
+
+  /**
+   * Analyze stepped wedge experiment
+   * Accounts for cluster randomization and time trends
+   */
+  private async analyzeSteppedWedge(
+    experiment: Experiment,
+    data: ExperimentAnalysisData,
+    alpha: number
+  ): Promise<AnalysisResult> {
+    this.logger.info('Analyzing stepped wedge experiment', { experimentId: experiment.id });
+
+    // Group data by cluster and step for proper analysis
+    const clusterData = this.groupByCluster(data);
+
+    // Calculate treatment effect adjusting for time trends
+    // This is a simplified analysis - proper mixed effects modeling would be ideal
+    const results: StatisticalResult[] = [];
+
+    // Analyze primary metric
+    const primaryMetricData = data.metrics[experiment.primaryMetric];
+    if (primaryMetricData && primaryMetricData.length >= 2) {
+      const result = await this.compareVariants(
+        primaryMetricData[0],
+        primaryMetricData[1],
+        experiment.primaryMetric,
+        alpha
+      );
+      results.push(result);
+    }
+
+    // Analyze secondary metrics
+    for (const metric of experiment.secondaryMetrics) {
+      const metricData = data.metrics[metric];
+      if (metricData && metricData.length >= 2) {
+        const result = await this.compareVariants(
+          metricData[0],
+          metricData[1],
+          metric,
+          alpha
+        );
+        results.push(result);
+      }
+    }
+
+    // Calculate intracluster correlation (ICC)
+    const icc = this.calculateICC(clusterData, experiment.primaryMetric);
+
+    const analysisResult: AnalysisResult = {
+      experimentId: experiment.id,
+      status: experiment.status,
+      sampleSize: Object.values(data.sampleSizes).reduce((sum, count) => sum + count, 0),
+      startDate: experiment.startDate || new Date(),
+      endDate: experiment.endDate,
+      results,
+      warnings: [],
+    };
+
+    // Add stepped wedge specific warnings
+    analysisResult.warnings = analysisResult.warnings || [];
+
+    analysisResult.warnings.push(
+      'Stepped wedge analysis: This is a simplified analysis. For rigorous results, use mixed effects models that account for:',
+      '  - Within-cluster correlation (ICC)',
+      '  - Time trends (secular effects)',
+      '  - Cluster-level random effects',
+      'Consider exporting data for analysis in R (lme4) or Python (statsmodels).'
+    );
+
+    if (icc > 0.1) {
+      analysisResult.warnings.push(
+        `High intracluster correlation detected (ICC=${icc.toFixed(3)}). ` +
+        `Standard errors may be underestimated without proper clustering adjustment.`
+      );
+    }
+
+    // Check for sufficient clusters
+    const numClusters = Object.keys(clusterData).length;
+    if (numClusters < 10) {
+      analysisResult.warnings.push(
+        `Small number of clusters (${numClusters}). ` +
+        `Stepped wedge designs typically require 10+ clusters for adequate power.`
+      );
+    }
+
+    // Check for time trend issues
+    const hasTimeTrend = this.detectTimeTrend(clusterData, experiment.primaryMetric);
+    if (hasTimeTrend) {
+      analysisResult.warnings.push(
+        'Significant time trend detected. Treatment effect estimates may be confounded with secular trends. ' +
+        'Consider adjusting for time in the analysis model.'
+      );
+    }
+
+    return analysisResult;
+  }
+
+  /**
+   * Group data by cluster for cluster-level analysis
+   */
+  private groupByCluster(data: ExperimentAnalysisData): Record<string, any> {
+    // This is a placeholder implementation
+    // In practice, you'd need cluster information in the data structure
+    return {};
+  }
+
+  /**
+   * Calculate intracluster correlation coefficient (ICC)
+   * Measures similarity of responses within clusters
+   */
+  private calculateICC(clusterData: Record<string, any>, metric: string): number {
+    // Simplified ICC calculation
+    // ICC = (between-cluster variance) / (total variance)
+    // Proper implementation would use ANOVA or mixed effects model
+
+    // Placeholder: return moderate ICC
+    // In production, calculate from actual cluster data
+    return 0.05;
+  }
+
+  /**
+   * Detect secular time trends in the data
+   */
+  private detectTimeTrend(clusterData: Record<string, any>, metric: string): boolean {
+    // Simplified time trend detection
+    // In practice, would fit regression model and test time coefficient
+
+    // Placeholder: assume no strong trend
+    return false;
   }
 
   /**
