@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExperimentStatus(str, Enum):
@@ -39,20 +39,19 @@ class RandomizationUnit(str, Enum):
 class Variant(BaseModel):
     """Experiment variant."""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     key: str = Field(..., description="Unique variant key")
     name: str = Field(..., description="Human-readable variant name")
     description: Optional[str] = Field(None, description="Variant description")
     allocation: float = Field(..., ge=0, le=100, description="Traffic allocation percentage")
     config: Optional[Dict[str, Any]] = Field(None, description="Variant configuration")
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
-
 
 class Assignment(BaseModel):
     """Experiment assignment result."""
+
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     experiment_id: str = Field(..., alias="experimentId")
     experiment_key: Optional[str] = Field(None, alias="experimentKey")
@@ -69,15 +68,11 @@ class Assignment(BaseModel):
     )
     timestamp: Optional[datetime] = None
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-        use_enum_values = True
-
 
 class ExposureEvent(BaseModel):
     """Exposure event data."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     experiment_id: str = Field(..., alias="experimentId")
     unit_id: str = Field(..., alias="unitId")
@@ -86,14 +81,11 @@ class ExposureEvent(BaseModel):
     context: Optional[Dict[str, Any]] = None
     timestamp: Optional[datetime] = None
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-
 
 class MetricEvent(BaseModel):
     """Metric event data."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     event_name: str = Field(..., alias="eventName")
     unit_id: str = Field(..., alias="unitId")
@@ -102,11 +94,6 @@ class MetricEvent(BaseModel):
     experiment_ids: Optional[List[str]] = Field(None, alias="experimentIds")
     timestamp: Optional[datetime] = None
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-
 
 class BatchEvent(BaseModel):
     """Batch event wrapper."""
@@ -114,7 +101,8 @@ class BatchEvent(BaseModel):
     type: str = Field(..., description="Event type: exposure or metric")
     data: Union[ExposureEvent, MetricEvent]
 
-    @validator("type")
+    @field_validator("type")
+    @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate event type."""
         if v not in ["exposure", "metric"]:
@@ -124,6 +112,8 @@ class BatchEvent(BaseModel):
 
 class FeatureFlag(BaseModel):
     """Feature flag model."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     id: str
     key: str
@@ -135,14 +125,11 @@ class FeatureFlag(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
     updated_at: datetime = Field(..., alias="updatedAt")
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-
 
 class FeatureFlagEvaluation(BaseModel):
     """Feature flag evaluation result."""
+
+    model_config = ConfigDict(use_enum_values=True)
 
     key: str
     value: Any
@@ -150,14 +137,11 @@ class FeatureFlagEvaluation(BaseModel):
     variant: Optional[str] = None
     reason: str
 
-    class Config:
-        """Pydantic config."""
-
-        use_enum_values = True
-
 
 class Experiment(BaseModel):
     """Experiment model."""
+
+    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     id: str
     key: str
@@ -182,29 +166,22 @@ class Experiment(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
     updated_at: datetime = Field(..., alias="updatedAt")
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-        use_enum_values = True
-
 
 class PaginationInfo(BaseModel):
     """Pagination information."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     page: int
     limit: int
     total: int
     total_pages: int = Field(..., alias="totalPages")
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-
 
 class APIResponse(BaseModel):
     """Generic API response."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     success: bool
     data: Optional[Any] = None
@@ -212,21 +189,13 @@ class APIResponse(BaseModel):
     pagination: Optional[PaginationInfo] = None
     timestamp: Optional[datetime] = None
 
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True
-
 
 class APIErrorResponse(BaseModel):
     """API error response."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     error: str
     message: str
     status_code: int = Field(..., alias="statusCode")
     details: Optional[Dict[str, Any]] = None
-
-    class Config:
-        """Pydantic config."""
-
-        populate_by_name = True

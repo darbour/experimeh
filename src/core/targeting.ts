@@ -126,7 +126,7 @@ export function evaluateRule(
   config: EvaluationConfig = {}
 ): EvaluationResult {
   const errors: string[] = [];
-  let evaluatedConditions = 0;
+  const evaluatedConditions = 0;
 
   try {
     const matches = evaluateRuleInternal(rule, context, config, errors, evaluatedConditions);

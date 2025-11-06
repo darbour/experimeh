@@ -13,7 +13,7 @@
  * - "Design and analysis of stepped wedge cluster randomized trials" - Hemming et al. (2015)
  */
 
-import { SteppedWedgeSchedule, SteppedWedgeConfig } from './assignment';
+import { SteppedWedgeSchedule } from './assignment';
 
 /**
  * Validate Stepped Wedge Schedule
