@@ -75,9 +75,29 @@ The system consists of six major components:
 5. **Data Pipeline**: Stream processing and storage
 6. **Analysis Engine**: Statistical analysis and reporting
 
-## API Documentation
+## Documentation
 
-See [docs/API.md](docs/API.md) for complete API reference.
+📚 **[Browse Full Documentation](https://darbour.github.io/experimeh/)** - Interactive documentation site with guides and API reference
+
+### Quick Links
+
+- **[Getting Started Guide](https://darbour.github.io/experimeh/)** - Introduction and quick start
+- **[API Reference](https://darbour.github.io/experimeh/api/)** - Complete TypeScript API documentation
+- **[Guides & Tutorials](https://darbour.github.io/experimeh/guides.html)** - In-depth guides and best practices
+
+### Building Documentation Locally
+
+```bash
+# Generate API documentation
+npm run docs:build
+
+# Serve documentation locally
+npm run docs:serve
+```
+
+The documentation will be available at `http://localhost:8080`
+
+## API Quick Reference
 
 ### Quick Example
 
@@ -173,13 +193,18 @@ Cluster-randomized trial where all clusters start in control and switch to treat
 }
 ```
 
-## Documentation
+## Additional Documentation
 
-- [Implementation Plan](EXPERIMENTATION_SYSTEM_PLAN.md)
-- [API Reference](docs/API.md)
-- [Statistical Methods](docs/STATISTICAL_METHODS.md)
-- [Best Practices](docs/BEST_PRACTICES.md)
-- [Examples](examples/)
+For comprehensive documentation, visit our **[Documentation Site](https://darbour.github.io/experimeh/)**
+
+Documentation files in this repository:
+
+- [Architecture Guide](docs/ARCHITECTURE.md) - System architecture and design
+- [Statistical Guide](docs/STATISTICAL_GUIDE.md) - Statistical methods and analysis
+- [Best Practices](docs/BEST_PRACTICES.md) - Design patterns and recommendations
+- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Examples](examples/) - Example implementations
 
 ## Testing
 

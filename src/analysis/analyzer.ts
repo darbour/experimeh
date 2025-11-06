@@ -48,7 +48,10 @@ import {
 import {
   tTestMDE,
   proportionTestMDE,
-  MinimumDetectableEffectResult
+  tTestSampleSize,
+  proportionTestSampleSize,
+  MinimumDetectableEffectResult,
+  PowerAnalysisResult
 } from './power';
 
 import {

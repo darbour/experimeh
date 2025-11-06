@@ -251,7 +251,7 @@ export class RedisAdapter implements ICacheStore {
     try {
       const fullKey = this.getFullKey(key);
       const result = await this.client.expire(fullKey, ttlSeconds);
-      return result;
+      return result === 1;
     } catch (error) {
       const err = error as Error;
       this.logger.error('Failed to set expiration', { error: err.message, key, ttlSeconds });

@@ -39,3 +39,6 @@ temp/
 
 # ESLint reports
 eslint-unused-report.json
+
+# Generated documentation
+docs-site/api/

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimeh Documentation</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Experimeh</h1>
+                <span class="nav-subtitle">Feature Flag Experimentation System</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="guides.html">Guides</a>
+                <a href="api/index.html">API Reference</a>
+                <a href="https://github.com/darbour/experimeh" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <div class="hero-content">
+            <h1>Experimeh Documentation</h1>
+            <p class="hero-subtitle">A comprehensive feature flag based experimentation system supporting complex experimental designs</p>
+            <div class="hero-buttons">
+                <a href="#getting-started" class="btn btn-primary">Get Started</a>
+                <a href="api/index.html" class="btn btn-secondary">API Reference</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section id="features" class="section">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🚩 Feature Flags</h3>
+                    <p>Real-time feature flag evaluation with targeting rules and gradual rollouts</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🧪 A/B Testing</h3>
+                    <p>Traditional two-variant experiments with statistical significance testing</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📊 Factorial Design</h3>
+                    <p>Test multiple factors simultaneously and detect interactions between variables</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔄 Switchback Experiments</h3>
+                    <p>Temporal switching to mitigate network interference in marketplace experiments</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📈 Stepped Wedge</h3>
+                    <p>Cluster-randomized trials with sequential rollout to all clusters</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚡ High Performance</h3>
+                    <p>Deterministic assignment with caching, &lt;10ms latency for assignments</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📡 Scalable</h3>
+                    <p>Event-driven architecture with Kafka for high-throughput data pipelines</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔒 Type Safe</h3>
+                    <p>Written in TypeScript with full type coverage and comprehensive validation</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="getting-started" class="section">
+            <h2>Getting Started</h2>
+
+            <h3>Installation</h3>
+            <pre><code class="language-bash">npm install experimeh</code></pre>
+
+            <h3>Quick Example</h3>
+            <pre><code class="language-typescript">import { createClient } from 'experimeh';
+
+// Create a client instance
+const client = createClient({
+  apiUrl: 'https://experiments.example.com',
+  apiKey: 'your-api-key',
+});
+
+await client.initialize();
+
+// Get assignment for a user
+const assignment = await client.getAssignment('exp-123', 'user-456');
+console.log('Assigned variant:', assignment.variantId);
+
+// Track exposure
+await client.trackExposure('exp-123', 'user-456', assignment.variantId);
+
+// Track metric
+await client.trackMetric('exp-123', 'user-456', 'conversion', 1);
+
+// Shutdown gracefully
+await client.shutdown();</code></pre>
+        </section>
+
+        <section id="documentation" class="section">
+            <h2>Documentation</h2>
+            <div class="doc-grid">
+                <a href="guides.html#architecture" class="doc-card">
+                    <h3>Architecture</h3>
+                    <p>Learn about the system architecture and core components</p>
+                </a>
+                <a href="api/index.html" class="doc-card">
+                    <h3>API Reference</h3>
+                    <p>Complete API documentation generated from source code</p>
+                </a>
+                <a href="guides.html#statistical" class="doc-card">
+                    <h3>Statistical Guide</h3>
+                    <p>Statistical analysis, power calculations, and best practices</p>
+                </a>
+                <a href="guides.html#best-practices" class="doc-card">
+                    <h3>Best Practices</h3>
+                    <p>Design patterns, optimization tips, and common pitfalls</p>
+                </a>
+                <a href="guides.html#deployment" class="doc-card">
+                    <h3>Deployment</h3>
+                    <p>Production deployment guides for various environments</p>
+                </a>
+                <a href="guides.html#troubleshooting" class="doc-card">
+                    <h3>Troubleshooting</h3>
+                    <p>Common issues and their solutions</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="sdks" class="section">
+            <h2>SDKs & Integrations</h2>
+            <div class="sdk-grid">
+                <div class="sdk-card">
+                    <h3>JavaScript/TypeScript</h3>
+                    <p>Native TypeScript SDK for Node.js applications</p>
+                    <a href="api/index.html">View Docs →</a>
+                </div>
+                <div class="sdk-card">
+                    <h3>Browser JavaScript</h3>
+                    <p>Lightweight client-side SDK for web applications</p>
+                    <a href="guides.html#browser-sdk">View Docs →</a>
+                </div>
+                <div class="sdk-card">
+                    <h3>React</h3>
+                    <p>React hooks and components for easy integration</p>
+                    <a href="guides.html#react-sdk">View Docs →</a>
+                </div>
+                <div class="sdk-card">
+                    <h3>Python</h3>
+                    <p>Python SDK for data science and backend services</p>
+                    <a href="guides.html#python-sdk">View Docs →</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="experiment-types" class="section">
+            <h2>Experiment Types</h2>
+            <div class="experiment-types">
+                <div class="experiment-type">
+                    <h3>Simple A/B Test</h3>
+                    <p>Compare two variants to determine which performs better</p>
+                    <pre><code class="language-typescript">const experiment = {
+  type: 'ab',
+  variants: ['control', 'treatment'],
+  allocation: [0.5, 0.5]
+};</code></pre>
+                </div>
+
+                <div class="experiment-type">
+                    <h3>Factorial Design</h3>
+                    <p>Test multiple factors simultaneously</p>
+                    <pre><code class="language-typescript">const experiment = {
+  type: 'factorial',
+  factors: [
+    { name: 'button_color', levels: ['blue', 'green'] },
+    { name: 'button_text', levels: ['Buy Now', 'Add to Cart'] }
+  ]
+};</code></pre>
+                </div>
+
+                <div class="experiment-type">
+                    <h3>Switchback</h3>
+                    <p>Temporal switching to reduce network effects</p>
+                    <pre><code class="language-typescript">const experiment = {
+  type: 'switchback',
+  switchDuration: 3600, // 1 hour
+  variants: ['control', 'treatment']
+};</code></pre>
+                </div>
+
+                <div class="experiment-type">
+                    <h3>Stepped Wedge</h3>
+                    <p>Gradual rollout across clusters over time</p>
+                    <pre><code class="language-typescript">const experiment = {
+  type: 'stepped_wedge',
+  clusters: ['region_1', 'region_2', 'region_3'],
+  stepDuration: 86400, // 1 day
+  sequence: [0, 1, 2] // rollout order
+};</code></pre>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Documentation</h4>
+                <ul>
+                    <li><a href="guides.html">Guides</a></li>
+                    <li><a href="api/index.html">API Reference</a></li>
+                    <li><a href="guides.html#best-practices">Best Practices</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Resources</h4>
+                <ul>
+                    <li><a href="https://github.com/darbour/experimeh">GitHub</a></li>
+                    <li><a href="guides.html#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="guides.html#deployment">Deployment</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Community</h4>
+                <ul>
+                    <li><a href="https://github.com/darbour/experimeh/issues">Issues</a></li>
+                    <li><a href="https://github.com/darbour/experimeh/discussions">Discussions</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Experimeh. Licensed under MIT.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+</body>
+</html>

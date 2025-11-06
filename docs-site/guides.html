@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guides - Experimeh Documentation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Experimeh</h1>
+                <span class="nav-subtitle">Feature Flag Experimentation System</span>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="guides.html" class="active">Guides</a>
+                <a href="api/index.html">API Reference</a>
+                <a href="https://github.com/darbour/experimeh" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="margin-top: 2rem; margin-bottom: 4rem;">
+        <h1>Documentation Guides</h1>
+        <p style="color: var(--text-secondary); font-size: 1.125rem; margin-bottom: 3rem;">
+            Comprehensive guides and documentation for the Experimeh experimentation system
+        </p>
+
+        <section id="architecture" class="section">
+            <h2>Architecture & Design</h2>
+            <div class="doc-grid">
+                <a href="../docs/ARCHITECTURE.md" class="doc-card">
+                    <h3>System Architecture</h3>
+                    <p>Overview of the system architecture, components, and data flow</p>
+                </a>
+                <a href="../docs/DESIGN_PATTERNS.md" class="doc-card">
+                    <h3>Design Patterns</h3>
+                    <p>Design patterns, architectural decisions, and implementation strategies</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="statistical" class="section">
+            <h2>Statistical Analysis</h2>
+            <div class="doc-grid">
+                <a href="../docs/STATISTICAL_GUIDE.md" class="doc-card">
+                    <h3>Statistical Guide</h3>
+                    <p>Comprehensive guide to statistical analysis, power calculations, and hypothesis testing</p>
+                </a>
+                <a href="../docs/STEPPED_WEDGE_GUIDE.md" class="doc-card">
+                    <h3>Stepped Wedge Design</h3>
+                    <p>Guide to stepped wedge cluster-randomized trials</p>
+                </a>
+                <a href="../docs/STEPPED_WEDGE_IMPLEMENTATION_GUIDE.md" class="doc-card">
+                    <h3>Stepped Wedge Implementation</h3>
+                    <p>Implementation details for stepped wedge experiments</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="best-practices" class="section">
+            <h2>Best Practices</h2>
+            <div class="doc-grid">
+                <a href="../docs/BEST_PRACTICES.md" class="doc-card">
+                    <h3>Best Practices Guide</h3>
+                    <p>Best practices for experiment design, implementation, and analysis</p>
+                </a>
+                <a href="../docs/TROUBLESHOOTING.md" class="doc-card">
+                    <h3>Troubleshooting</h3>
+                    <p>Common issues, debugging strategies, and solutions</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="deployment" class="section">
+            <h2>Deployment & Operations</h2>
+            <div class="doc-grid">
+                <a href="../docs/DEPLOYMENT.md" class="doc-card">
+                    <h3>Deployment Guide</h3>
+                    <p>Production deployment strategies for various environments</p>
+                </a>
+                <a href="../DOCKER_SETUP.md" class="doc-card">
+                    <h3>Docker Setup</h3>
+                    <p>Containerization and Docker deployment instructions</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="sdks" class="section">
+            <h2>SDKs & Client Libraries</h2>
+
+            <h3 id="browser-sdk">Browser JavaScript SDK</h3>
+            <p>Lightweight client-side SDK for web applications. See <a href="../sdks/browser-js/README.md">Browser JavaScript SDK Documentation</a></p>
+
+            <h3 id="react-sdk">React SDK</h3>
+            <p>React hooks and components for seamless integration. See <a href="../sdks/react/README.md">React SDK Documentation</a></p>
+
+            <h3 id="python-sdk">Python SDK</h3>
+            <p>Python client for data science and backend services. See <a href="../sdks/python/README.md">Python SDK Documentation</a></p>
+
+            <div class="doc-grid" style="margin-top: 1.5rem;">
+                <a href="../sdks/README.md" class="doc-card">
+                    <h3>SDK Overview</h3>
+                    <p>Overview of all available SDKs and their capabilities</p>
+                </a>
+                <a href="../sdks/QUICK_REFERENCE.md" class="doc-card">
+                    <h3>Quick Reference</h3>
+                    <p>Quick reference guide for SDK usage</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="examples" class="section">
+            <h2>Examples</h2>
+            <div class="doc-grid">
+                <a href="../examples/README.md" class="doc-card">
+                    <h3>Example Projects</h3>
+                    <p>Example implementations and use cases</p>
+                </a>
+                <a href="../dashboard/README.md" class="doc-card">
+                    <h3>Dashboard</h3>
+                    <p>Web dashboard for experiment management and visualization</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="api-docs" class="section">
+            <h2>API Documentation</h2>
+            <div class="doc-grid">
+                <a href="../API_DOCUMENTATION.md" class="doc-card">
+                    <h3>API Documentation</h3>
+                    <p>REST API endpoints and usage</p>
+                </a>
+                <a href="../API_ENDPOINTS_SUMMARY.md" class="doc-card">
+                    <h3>API Endpoints Summary</h3>
+                    <p>Quick reference for all API endpoints</p>
+                </a>
+                <a href="api/index.html" class="doc-card">
+                    <h3>TypeScript API Reference</h3>
+                    <p>Auto-generated API documentation from source code</p>
+                </a>
+            </div>
+        </section>
+
+        <section id="additional" class="section">
+            <h2>Additional Resources</h2>
+            <div class="doc-grid">
+                <a href="../README.md" class="doc-card">
+                    <h3>Main README</h3>
+                    <p>Project overview and quick start guide</p>
+                </a>
+                <a href="../ANALYSIS_ENGINE_README.md" class="doc-card">
+                    <h3>Analysis Engine</h3>
+                    <p>Statistical analysis engine documentation</p>
+                </a>
+                <a href="../SDK_README.md" class="doc-card">
+                    <h3>SDK Development</h3>
+                    <p>Guide for SDK development and contributions</p>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Documentation</h4>
+                <ul>
+                    <li><a href="guides.html">Guides</a></li>
+                    <li><a href="api/index.html">API Reference</a></li>
+                    <li><a href="#best-practices">Best Practices</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Resources</h4>
+                <ul>
+                    <li><a href="https://github.com/darbour/experimeh">GitHub</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#deployment">Deployment</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Community</h4>
+                <ul>
+                    <li><a href="https://github.com/darbour/experimeh/issues">Issues</a></li>
+                    <li><a href="https://github.com/darbour/experimeh/discussions">Discussions</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Experimeh. Licensed under MIT.</p>
+        </div>
+    </footer>
+</body>
+</html>
