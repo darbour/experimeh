@@ -279,6 +279,52 @@ export interface AuditMetadata {
 }
 
 /**
+ * Assignment mode for experiment
+ */
+export enum AssignmentMode {
+  /** Static assignment using randomization */
+  STATIC = 'static',
+  /** Adaptive assignment using bandit algorithms */
+  BANDIT = 'bandit',
+}
+
+/**
+ * Bandit algorithm types
+ */
+export enum BanditAlgorithmType {
+  /** Thompson Sampling - Bayesian approach */
+  THOMPSON_SAMPLING = 'thompson_sampling',
+  /** Epsilon-Greedy - Simple exploration-exploitation */
+  EPSILON_GREEDY = 'epsilon_greedy',
+  /** Upper Confidence Bound - Confidence-based exploration */
+  UCB = 'ucb',
+}
+
+/**
+ * Bandit experiment configuration
+ */
+export interface BanditConfiguration {
+  /** Algorithm to use */
+  algorithm: BanditAlgorithmType;
+  /** Metric used for rewards (must be in primaryMetric or secondaryMetrics) */
+  rewardMetric: string;
+  /** Epsilon value for epsilon-greedy (0-1) */
+  epsilon?: number;
+  /** Exploration parameter for UCB (typically 2) */
+  explorationParam?: number;
+  /** Number of initial random assignments per arm (warmup period) */
+  warmupTrialsPerArm?: number;
+  /** Prior alpha for Thompson Sampling (default: 1) */
+  priorAlpha?: number;
+  /** Prior beta for Thompson Sampling (default: 1) */
+  priorBeta?: number;
+  /** Decay rate for epsilon-greedy (0-1, default: 0.99) */
+  decayRate?: number;
+  /** Minimum epsilon for epsilon-greedy (default: 0.01) */
+  minEpsilon?: number;
+}
+
+/**
  * Complete experiment definition
  */
 export interface Experiment {
@@ -330,6 +376,11 @@ export interface Experiment {
   /** Minimum sample size before making decisions */
   minSampleSize: number;
 
+  /** Assignment mode: static or bandit */
+  assignmentMode: AssignmentMode;
+  /** Bandit configuration (required if assignmentMode is 'bandit') */
+  banditConfig?: BanditConfiguration;
+
   /** Custom metadata */
   metadata: Record<string, unknown>;
   /** Audit trail */
@@ -363,6 +414,8 @@ export interface CreateExperimentRequest {
   endDate?: Date;
   minSampleSize?: number;
   powerAnalysis?: Omit<PowerAnalysis, 'calculatedAt' | 'requiredSampleSize' | 'expectedRuntimeDays'>;
+  assignmentMode?: AssignmentMode;
+  banditConfig?: BanditConfiguration;
   metadata?: Record<string, unknown>;
   tags?: string[];
   owner: string;

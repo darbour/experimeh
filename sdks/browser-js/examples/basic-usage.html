@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Experimeh Browser SDK - Basic Usage</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .experiment {
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+    }
+    .control {
+      background-color: #f0f0f0;
+    }
+    .treatment {
+      background-color: #e3f2fd;
+      border-color: #2196f3;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .btn-control {
+      background-color: #757575;
+      color: white;
+    }
+    .btn-treatment {
+      background-color: #2196f3;
+      color: white;
+    }
+    #status {
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Experimeh Browser SDK - Basic Usage</h1>
+
+  <div id="status">Loading...</div>
+
+  <div id="experiment-container"></div>
+
+  <button onclick="trackConversion()">Track Conversion</button>
+
+  <script type="module">
+    import { ExperimentClient } from 'https://unpkg.com/@experimeh/browser@1.0.0/dist/index.esm.js';
+
+    // Initialize client
+    const client = new ExperimentClient({
+      apiUrl: 'https://api.example.com',
+      apiKey: 'demo-key',
+      cacheEnabled: true,
+    });
+
+    // Get user ID (in production, use real user ID)
+    const userId = 'demo-user-' + Math.random().toString(36).substr(2, 9);
+
+    // Get assignment
+    async function loadExperiment() {
+      try {
+        const assignment = await client.getAssignment('button-test', userId);
+
+        // Track exposure
+        await client.trackExposure('button-test', userId, assignment.variantKey);
+
+        // Update UI
+        document.getElementById('status').innerHTML = `
+          <strong>Experiment:</strong> button-test<br>
+          <strong>User ID:</strong> ${userId}<br>
+          <strong>Variant:</strong> ${assignment.variantKey}
+        `;
+
+        const container = document.getElementById('experiment-container');
+        container.innerHTML = `
+          <div class="experiment ${assignment.variantKey}">
+            <h2>You are in: ${assignment.variantKey}</h2>
+            <button class="btn-${assignment.variantKey}">
+              ${assignment.variantKey === 'treatment' ? 'New Button' : 'Old Button'}
+            </button>
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('status').innerHTML = `
+          <strong style="color: red;">Error:</strong> ${error.message}
+        `;
+        console.error('Failed to load experiment:', error);
+      }
+    }
+
+    // Track conversion
+    window.trackConversion = async function() {
+      try {
+        await client.trackMetric('button_click', userId, 1);
+        alert('Conversion tracked!');
+      } catch (error) {
+        alert('Failed to track conversion: ' + error.message);
+      }
+    };
+
+    // Load on page load
+    loadExperiment();
+  </script>
+</body>
+</html>
