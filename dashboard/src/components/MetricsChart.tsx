@@ -4,6 +4,7 @@ import {
   Line,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -201,8 +202,8 @@ export default function MetricsChart({ analysis }: MetricsChartProps) {
                 radius={[4, 4, 0, 0]}
               >
                 {comparisonData.map((entry, index) => (
-                  <Bar
-                    key={`bar-${index}`}
+                  <Cell
+                    key={`cell-${index}`}
                     fill={entry.significant ? '#10b981' : '#0ea5e9'}
                   />
                 ))}
