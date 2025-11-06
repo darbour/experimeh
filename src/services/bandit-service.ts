@@ -153,7 +153,8 @@ export class BanditService {
       } else if (isUCBConfig(options.config)) {
         state = UCB.initialize(options.armIds, options.config);
       } else {
-        throw new Error(`Unsupported algorithm: ${options.config.algorithm}`);
+        // Type guard should ensure we never reach here, but TypeScript needs the assertion
+        throw new Error(`Unsupported algorithm: ${(options.config as BanditConfig).algorithm}`);
       }
 
       // Initialize reward tracker

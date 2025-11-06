@@ -19,10 +19,28 @@
 // Core types
 export * from './bandit-types';
 
-// Algorithm implementations
-export * from './thompson-sampling';
-export * from './epsilon-greedy';
-export * from './ucb';
+// Algorithm namespace objects (contain all methods)
+export { ThompsonSampling } from './thompson-sampling';
+export { EpsilonGreedy } from './epsilon-greedy';
+export { UCB } from './ucb';
+
+// Type guard functions
+export {
+  isThompsonSamplingConfig,
+  isThompsonSamplingState,
+  isEpsilonGreedyConfig,
+  isEpsilonGreedyState,
+  isUCBConfig,
+  isUCBState,
+} from './bandit-types';
 
 // Reward tracking
-export * from './reward-tracker';
+export {
+  createRewardTracker,
+  trackReward,
+  getArmStatistics,
+  calculateCumulativeRegret,
+  calculateSimpleRegret,
+  type RewardTrackerState,
+  type RewardTracker,
+} from './reward-tracker';

@@ -20,17 +20,14 @@ import {
   twoProportionZTest,
   oneWayANOVA,
   factorialANOVA,
-  multipleRegression,
   TTestResult,
   ZTestResult,
   ANOVAResult,
-  RegressionResult
 } from './statistical-tests';
 
 import {
   analyzeSteppedWedge,
   SteppedWedgeData,
-  SteppedWedgeAnalysisResult
 } from './stepped-wedge-analysis';
 
 
@@ -45,24 +42,17 @@ import {
   bonferroniCorrection,
   holmBonferroniCorrection,
   benjaminiHochbergCorrection,
-  sequentialTest,
   MultipleTestingResult,
-  SequentialTestResult
 } from './corrections';
 
 import {
-  tTestSampleSize,
-  proportionTestSampleSize,
   tTestMDE,
   proportionTestMDE,
-  PowerAnalysisResult,
   MinimumDetectableEffectResult
 } from './power';
 
 import {
-  applyCUPED,
   cupedABTest,
-  stratifiedABTest,
   CUPEDResult
 } from './variance-reduction';
 
@@ -831,8 +821,8 @@ export class ExperimentAnalyzer {
     recommendations.push('Implement full repeated measures ANOVA or mixed-effects model');
 
     // For now, perform paired comparison if possible
-    const subjects = Array.from(new Set(data.assignment.subject));
-    const variants = Array.from(new Set(data.assignment.variant));
+    const _subjects = Array.from(new Set(data.assignment.subject));
+    const _variants = Array.from(new Set(data.assignment.variant));
 
     // Return placeholder result
     // TODO: Implement full repeated measures ANOVA

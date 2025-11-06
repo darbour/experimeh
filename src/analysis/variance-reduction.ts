@@ -408,7 +408,7 @@ export function stratifiedAnalysis(
     weight: number;
   }> = [];
 
-  let totalN = outcomes.length;
+  const totalN = outcomes.length;
 
   for (const stratumKey in strataGroups) {
     const stratumOutcomes = strataGroups[stratumKey];
