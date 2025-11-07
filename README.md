@@ -21,9 +21,46 @@ A comprehensive feature flag based experimentation system supporting complex exp
 ### Prerequisites
 
 - Node.js >= 18.0.0
+- Docker >= 20.10 (for infrastructure)
+- Docker Compose >= 2.0 (for infrastructure)
+
+Or manually install:
 - PostgreSQL >= 14
 - Redis >= 6
-- Kafka >= 3.0 (optional, for production)
+- Kafka >= 3.0
+
+### Infrastructure Setup
+
+The easiest way to get started is using Docker:
+
+```bash
+# Start all infrastructure services (Postgres, Redis, Kafka, Zookeeper)
+./scripts/infra-setup.sh
+
+# Follow logs after setup
+./scripts/infra-setup.sh --logs
+
+# Check infrastructure health
+./scripts/infra-health.sh
+
+# View detailed status
+./scripts/infra-health.sh --details
+
+# Stop infrastructure
+./scripts/infra-teardown.sh
+
+# Stop and remove all data
+./scripts/infra-teardown.sh --volumes
+
+# Complete reset (teardown + setup)
+./scripts/infra-reset.sh
+```
+
+**Services started:**
+- PostgreSQL: `localhost:5432` (DB: `experimeh_test`, User: `experimeh`, Password: `test_password`)
+- Redis: `localhost:6379`
+- Kafka: `localhost:9092`
+- Zookeeper: `localhost:2181`
 
 ### Installation
 
