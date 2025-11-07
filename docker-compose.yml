@@ -79,6 +79,44 @@ services:
       timeout: 10s
       retries: 5
 
+  experimeh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/darbour/experimeh:latest
+    container_name: experimeh-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: experimeh_test
+      POSTGRES_USER: experimeh
+      POSTGRES_PASSWORD: test_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:29092
+      LOG_LEVEL: info
+    networks:
+      - experimeh-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
 volumes:
   postgres_data:
 

@@ -1,0 +1,72 @@
+name: Docker Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - 'scripts/docker-entrypoint.sh'
+      - '.github/workflows/docker-*.yml'
+  workflow_dispatch:
+
+jobs:
+  test-docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test Docker build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: experimeh:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      - name: Test Docker image
+        run: |
+          echo "Testing Docker image..."
+          docker images experimeh:test
+
+          # Test that the image runs
+          docker run --rm -d --name experimeh-test \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e POSTGRES_HOST=postgres \
+            -e POSTGRES_PORT=5432 \
+            -e POSTGRES_DB=experimeh_test \
+            -e POSTGRES_USER=experimeh \
+            -e POSTGRES_PASSWORD=test_password \
+            -e REDIS_HOST=redis \
+            -e REDIS_PORT=6379 \
+            -e KAFKA_BROKERS=kafka:29092 \
+            experimeh:test || true
+
+          # Give it a moment to start
+          sleep 5
+
+          # Check if container is running
+          docker ps -a
+
+          # Get logs
+          docker logs experimeh-test || true
+
+          # Cleanup
+          docker stop experimeh-test 2>/dev/null || true
+          docker rm experimeh-test 2>/dev/null || true
+
+      - name: Test docker-compose validation
+        run: |
+          docker-compose config

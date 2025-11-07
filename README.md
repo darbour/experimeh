@@ -101,6 +101,72 @@ npm run test:unit
 npm run test:coverage
 ```
 
+## Docker Deployment
+
+### Pre-built Images
+
+The application is automatically built and published to GitHub Container Registry on every push to main and on version tags.
+
+**Pull and run the latest image:**
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/darbour/experimeh:latest
+
+# Run the full stack (app + dependencies)
+docker-compose up -d
+
+# Check health
+curl http://localhost:3000/health
+```
+
+**Available image tags:**
+- `latest`: Most recent build from main branch
+- `v1.0.0`: Specific version tags
+- `main-{sha}`: Commit-specific builds
+
+### Local Docker Build
+
+```bash
+# Build locally
+docker build -t experimeh:local .
+
+# Or use docker-compose
+docker-compose build
+```
+
+### Docker Compose
+
+The `docker-compose.yml` includes the complete stack:
+- Experimeh application (port 3000)
+- PostgreSQL database (port 5432)
+- Redis cache (port 6379)
+- Kafka + Zookeeper (port 9092)
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f experimeh
+
+# Scale the application
+docker-compose up -d --scale experimeh=3
+
+# Stop all services
+docker-compose down
+```
+
+### Production Deployment
+
+See [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md) for:
+- Kubernetes deployment
+- Cloud platform deployment (AWS, GCP, Azure)
+- Security best practices
+- Monitoring and logging
+- CI/CD automation
+- Environment configuration
+
 ## Architecture
 
 The system consists of six major components:
