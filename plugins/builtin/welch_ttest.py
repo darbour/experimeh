@@ -193,7 +193,7 @@ class WelchTTest(AnalysisPlugin):
             },
             assumptions_met=assumptions,
             warnings=warnings,
-            diagnostics={
+            residual_diagnostics={
                 't_statistic': test_result['t_statistic'],
                 'control_mean': test_result['mean_control'],
                 'treatment_mean': test_result['mean_treatment'],
