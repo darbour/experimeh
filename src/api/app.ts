@@ -16,6 +16,7 @@ import experimentsRouter from './routes/experiments';
 import featureFlagsRouter from './routes/feature-flags';
 import assignmentsRouter from './routes/assignments';
 import eventsRouter from './routes/events';
+import surveyExperimentsRouter from './routes/survey-experiments';
 
 /**
  * Create and configure Express application
@@ -94,6 +95,7 @@ export function createApp(): Application {
   app.use('/api/v1/flags', featureFlagsRouter);
   app.use('/api/v1/assignments', assignmentsRouter);
   app.use('/api/v1/events', eventsRouter);
+  app.use('/api/v1/survey-experiments', surveyExperimentsRouter);
 
   // 404 handler
   app.use(notFoundHandler);
