@@ -123,6 +123,25 @@ export interface Variant {
 }
 
 /**
+ * Links experiment variants to feature flag variants
+ * This establishes the mapping between the flag's variants and experiment roles
+ */
+export interface VariantAllocation {
+  /** Unique identifier */
+  id: string;
+  /** Links to FeatureFlagVariant.id */
+  flagVariantId: string;
+  /** Links to FeatureFlagVariant.key for convenience */
+  flagVariantKey: string;
+  /** Role in the experiment */
+  experimentRole: 'control' | 'treatment' | 'treatment_1' | 'treatment_2' | 'treatment_3';
+  /** Allocation percentage for this variant (0-100) */
+  allocationPercentage: number;
+  /** Human-readable description of this allocation */
+  description: string;
+}
+
+/**
  * Configuration specific to factorial designs
  */
 export interface FactorialDesignConfig {
@@ -342,6 +361,11 @@ export interface Experiment {
   /** Type of experimental design */
   designType: ExperimentDesignType;
 
+  /** REQUIRED: Feature flag this experiment is built upon */
+  featureFlagId: string;
+  /** Variant allocations linking flag variants to experiment roles */
+  variantAllocations: VariantAllocation[];
+
   /** Hypothesis being tested */
   hypothesis: string;
   /** Primary metric key */
@@ -400,6 +424,8 @@ export interface CreateExperimentRequest {
   name: string;
   description: string;
   designType: ExperimentDesignType;
+  featureFlagId: string;  // REQUIRED: Must link to existing feature flag
+  variantAllocations: Omit<VariantAllocation, 'id'>[];
   hypothesis: string;
   primaryMetric: string;
   secondaryMetrics?: string[];
