@@ -35,7 +35,8 @@ export default function Step1_SelectFlag({ wizardState, setWizardState }: Props)
         });
       }
     }
-  }, [wizardState.featureFlagId, flags]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardState.featureFlagId, wizardState.featureFlag, flags]);
 
   const handleSelectFlag = (flag: FeatureFlag) => {
     setWizardState({

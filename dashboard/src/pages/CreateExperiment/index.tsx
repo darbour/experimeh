@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Check, Loader } from 'lucide-react';
 import { useCreateExperiment } from '../../hooks/useExperiments';
-import type { CreateExperimentForm, VariantAllocation } from '../../types';
+import type { CreateExperimentForm, VariantAllocation, FeatureFlag } from '../../types';
 import Step1_SelectFlag from './Step1_SelectFlag';
 import Step2_DesignType from './Step2_DesignType';
 import Step3_Configure from './Step3_Configure';
@@ -21,7 +21,7 @@ export type ExperimentDesignType = 'ab' | 'factorial' | 'switchback' | 'stepped_
 export interface WizardState {
   // Step 1: Flag selection
   featureFlagId: string | null;
-  featureFlag: any | null;
+  featureFlag: FeatureFlag | null;
 
   // Step 2: Design type
   designType: ExperimentDesignType | null;
@@ -34,7 +34,6 @@ export interface WizardState {
   secondaryMetrics: string[];
 
   // Design-specific configurations
-  abConfig?: any;
   factorialConfig?: {
     factors: Array<{ name: string; levels: string[] }>;
   };
@@ -60,13 +59,7 @@ export interface WizardState {
   };
 
   // Variant allocations
-  variantAllocations: Array<{
-    flagVariantId: string;
-    flagVariantKey: string;
-    experimentRole: string;
-    allocationPercentage: number;
-    description: string;
-  }>;
+  variantAllocations: Omit<VariantAllocation, 'id'>[];
 }
 
 const STEPS = [
@@ -76,6 +69,19 @@ const STEPS = [
   { id: 4, title: 'Power Analysis', description: 'Calculate sample size' },
   { id: 5, title: 'Review', description: 'Review and launch' },
 ];
+
+/**
+ * Helper to map variant index to experiment role
+ */
+function getExperimentRole(index: number): VariantAllocation['experimentRole'] {
+  if (index === 0) return 'control';
+  if (index === 1) return 'treatment';
+  if (index === 2) return 'treatment_1';
+  if (index === 3) return 'treatment_2';
+  if (index === 4) return 'treatment_3';
+  // Fallback for >5 variants (should not happen, but type-safe)
+  return 'treatment';
+}
 
 /**
  * Generate variant allocations based on design type and flag variants
@@ -95,7 +101,7 @@ function generateVariantAllocations(
         allocations.push({
           flagVariantId: variant.id,
           flagVariantKey: variant.key,
-          experimentRole: index === 0 ? 'control' : 'treatment',
+          experimentRole: getExperimentRole(index),
           allocationPercentage: percentage,
           description: `${variant.name} - ${index === 0 ? 'Control' : 'Treatment'} group`,
         });
@@ -116,7 +122,7 @@ function generateVariantAllocations(
           allocations.push({
             flagVariantId: variant.id,
             flagVariantKey: variant.key,
-            experimentRole: index === 0 ? 'control' : (`treatment_${index}` as any),
+            experimentRole: getExperimentRole(index),
             allocationPercentage: percentage,
             description: `${variant.name} - Factorial condition ${index + 1}`,
           });
@@ -128,7 +134,7 @@ function generateVariantAllocations(
           allocations.push({
             flagVariantId: variant.id,
             flagVariantKey: variant.key,
-            experimentRole: index === 0 ? 'control' : 'treatment',
+            experimentRole: getExperimentRole(index),
             allocationPercentage: percentage,
             description: variant.name,
           });
@@ -145,7 +151,7 @@ function generateVariantAllocations(
         allocations.push({
           flagVariantId: variant.id,
           flagVariantKey: variant.key,
-          experimentRole: index === 0 ? 'control' : 'treatment',
+          experimentRole: getExperimentRole(index),
           allocationPercentage: percentage,
           description: `${variant.name} - Time period ${index + 1}`,
         });
@@ -161,7 +167,7 @@ function generateVariantAllocations(
         allocations.push({
           flagVariantId: variant.id,
           flagVariantKey: variant.key,
-          experimentRole: index === 0 ? 'control' : 'treatment',
+          experimentRole: getExperimentRole(index),
           allocationPercentage: percentage,
           description: `${variant.name} - ${index === 0 ? 'Initial control' : 'Rollout treatment'}`,
         });

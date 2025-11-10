@@ -147,10 +147,21 @@ class ApiClient {
       params.hasExperiments = filters.hasExperiments;
     }
 
-    const response = await this.client.get<PaginatedResponse<FeatureFlag>>('/flags', {
-      params,
-    });
-    return response.data;
+    // Backend returns: { success, data, pagination }
+    // Transform to: { data, total, page, page_size, total_pages }
+    const response = await this.client.get<{
+      success: boolean;
+      data: FeatureFlag[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>('/flags', { params });
+
+    return {
+      data: response.data.data,
+      total: response.data.pagination.total,
+      page: response.data.pagination.page,
+      page_size: response.data.pagination.limit,
+      total_pages: response.data.pagination.totalPages,
+    };
   }
 
   async getFeatureFlag(id: string): Promise<FeatureFlag> {
