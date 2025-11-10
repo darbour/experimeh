@@ -214,3 +214,99 @@ export interface DashboardStats {
   total_assignments_today: number;
   recent_results: AnalysisResult[];
 }
+
+// Survey Experiments Types
+export type SurveyAnalysisType = 'paired_comparison' | 'multi_item';
+export type SurveyAnalysisStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface SurveyAnalysis {
+  id: string;
+  name: string;
+  analysisType: SurveyAnalysisType;
+  status: SurveyAnalysisStatus;
+  createdAt: string;
+  completedAt?: string;
+  config: any;
+  results?: SurveyAnalysisResult;
+  qualityChecks?: SurveyQualityResults;
+  error?: string;
+}
+
+export interface SurveyAnalysisResult {
+  method: string;
+  estimates: Record<string, number>;
+  confidence_intervals: Record<string, [number, number]>;
+  p_values: Record<string, number>;
+  standard_errors: Record<string, number>;
+  sample_sizes: Record<string, number>;
+  effect_sizes?: Record<string, number>;
+  assumptions_met?: Record<string, boolean>;
+  warnings?: string[];
+  residual_diagnostics?: Record<string, any>;
+  random_effects?: Record<string, any>;
+  temporal_effects?: Record<string, any>;
+  effective_sample_size?: number;
+}
+
+export interface QualityCheck {
+  n_flagged?: number;
+  pct_flagged?: number;
+  flagged_respondents?: string[];
+  avg_rate?: number;
+  threshold?: number;
+  error?: string;
+}
+
+export interface BiasCheck {
+  detected?: boolean;
+  significant?: boolean;
+  p_value?: number;
+  correlation?: number;
+  interpretation?: string;
+  error?: string;
+}
+
+export interface SurveyQualityResults {
+  quality_checks: {
+    straightlining?: QualityCheck & { n_straightliners?: number; pct_straightliners?: number };
+    speeding?: QualityCheck & { n_speeders?: number; pct_speeders?: number };
+    attention?: QualityCheck & { n_failed?: number; pct_failed?: number; pass_rate?: number };
+    response_variance?: QualityCheck & { n_low_variance?: number; pct_low_variance?: number; avg_variance?: number };
+  };
+  bias_checks: {
+    order_bias?: BiasCheck & { order_bias_detected?: boolean; spearman_correlation?: number; linear_slope?: number };
+    scale_bias?: BiasCheck & { extreme_usage?: number; midpoint_usage?: number; extreme_avoidance?: boolean };
+  };
+  balance_checks: {
+    randomization?: {
+      all_balanced?: boolean;
+      imbalanced_variables?: string[];
+      n_imbalanced?: number;
+    };
+  };
+}
+
+export interface SurveyAnalysisConfig {
+  // Common config
+  alpha?: number;
+
+  // Paired comparison config
+  subject_column?: string;
+  condition_column?: string;
+  metric_column?: string;
+  control_value?: string;
+  treatment_value?: string;
+  order_column?: string;
+
+  // Multi-item config
+  respondent_column?: string;
+  item_column?: string;
+  treatment_column?: string;
+
+  // Quality checks config
+  rating_columns?: string[];
+  duration_column?: string;
+  attention_column?: string;
+  attention_correct_answer?: any;
+  covariate_columns?: string[];
+}

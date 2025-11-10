@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   Activity,
+  FileText,
 } from 'lucide-react';
 import { useConnectionStatus } from '../hooks/useRealtime';
 
@@ -32,6 +33,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Experiments', href: '/experiments', icon: FlaskConical },
+    { name: 'Survey Experiments', href: '/survey-experiments', icon: FileText },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 

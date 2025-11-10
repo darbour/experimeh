@@ -6,6 +6,9 @@ import ExperimentDetail from './components/ExperimentDetail';
 import CreateExperiment from './components/CreateExperiment';
 import Dashboard from './pages/Dashboard';
 import Analytics from './pages/Analytics';
+import SurveyExperiments from './pages/SurveyExperiments';
+import NewSurveyAnalysis from './pages/NewSurveyAnalysis';
+import SurveyAnalysisDetail from './pages/SurveyAnalysisDetail';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -29,6 +32,9 @@ function App() {
             <Route path="/experiments/new" element={<CreateExperiment />} />
             <Route path="/experiments/:id" element={<ExperimentDetail />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/survey-experiments" element={<SurveyExperiments />} />
+            <Route path="/survey-experiments/new" element={<NewSurveyAnalysis />} />
+            <Route path="/survey-experiments/:id" element={<SurveyAnalysisDetail />} />
           </Routes>
         </Layout>
       </Router>
