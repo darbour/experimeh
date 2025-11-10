@@ -107,22 +107,24 @@ async function executePythonPlugin(
  * POST /api/v1/survey-experiments/upload
  * Upload survey data file
  */
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+router.post('/upload', upload.single('file'), async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'No file uploaded'
       });
+      return;
     }
 
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Analysis name is required'
       });
+      return;
     }
 
     const analysisId = uuidv4();
@@ -163,7 +165,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
  * POST /api/v1/survey-experiments/analyze
  * Run survey analysis
  */
-router.post('/analyze', async (req: Request, res: Response) => {
+router.post('/analyze', async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       analysisId,
@@ -172,25 +174,28 @@ router.post('/analyze', async (req: Request, res: Response) => {
     } = req.body;
 
     if (!analysisId || !analysisType) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'analysisId and analysisType are required'
       });
+      return;
     }
 
     const analysis = analyses.get(analysisId);
     if (!analysis) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Analysis not found'
       });
+      return;
     }
 
     if (!analysis.dataPath) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'No data file found for this analysis'
       });
+      return;
     }
 
     // Update status
@@ -208,10 +213,11 @@ router.post('/analyze', async (req: Request, res: Response) => {
     if (!pluginPath) {
       analysis.status = 'failed';
       analysis.error = `Unknown analysis type: ${analysisType}`;
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: analysis.error
       });
+      return;
     }
 
     // Execute analysis in background
@@ -247,30 +253,33 @@ router.post('/analyze', async (req: Request, res: Response) => {
  * POST /api/v1/survey-experiments/quality
  * Run quality checks on survey data
  */
-router.post('/quality', async (req: Request, res: Response) => {
+router.post('/quality', async (req: Request, res: Response): Promise<void> => {
   try {
     const { analysisId, checks } = req.body;
 
     if (!analysisId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'analysisId is required'
       });
+      return;
     }
 
     const analysis = analyses.get(analysisId);
     if (!analysis) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Analysis not found'
       });
+      return;
     }
 
     if (!analysis.dataPath) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'No data file found for this analysis'
       });
+      return;
     }
 
     // Run quality checks Python script
@@ -306,15 +315,16 @@ router.post('/quality', async (req: Request, res: Response) => {
  * GET /api/v1/survey-experiments/:id
  * Get analysis results
  */
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response): void => {
   try {
     const analysis = analyses.get(req.params.id);
 
     if (!analysis) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Analysis not found'
       });
+      return;
     }
 
     // Don't send dataPath to client
@@ -337,7 +347,7 @@ router.get('/:id', (req: Request, res: Response) => {
  * GET /api/v1/survey-experiments
  * List all analyses
  */
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response): void => {
   try {
     const { status, analysisType, limit = 50 } = req.query;
 
@@ -382,15 +392,16 @@ router.get('/', (req: Request, res: Response) => {
  * DELETE /api/v1/survey-experiments/:id
  * Delete analysis and associated data
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const analysis = analyses.get(req.params.id);
 
     if (!analysis) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Analysis not found'
       });
+      return;
     }
 
     // Delete uploaded file
