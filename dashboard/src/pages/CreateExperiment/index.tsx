@@ -7,7 +7,9 @@
 
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Loader } from 'lucide-react';
+import { useCreateExperiment } from '../../hooks/useExperiments';
+import type { CreateExperimentForm, VariantAllocation } from '../../types';
 import Step1_SelectFlag from './Step1_SelectFlag';
 import Step2_DesignType from './Step2_DesignType';
 import Step3_Configure from './Step3_Configure';
@@ -75,6 +77,102 @@ const STEPS = [
   { id: 5, title: 'Review', description: 'Review and launch' },
 ];
 
+/**
+ * Generate variant allocations based on design type and flag variants
+ */
+function generateVariantAllocations(
+  designType: ExperimentDesignType,
+  flagVariants: Array<{ id: string; key: string; name: string }>,
+  factorialConfig?: { factors: Array<{ name: string; levels: string[] }> }
+): Omit<VariantAllocation, 'id'>[] {
+  const allocations: Omit<VariantAllocation, 'id'>[] = [];
+
+  switch (designType) {
+    case 'ab': {
+      // Simple A/B test: split variants evenly
+      const percentage = 100 / flagVariants.length;
+      flagVariants.forEach((variant, index) => {
+        allocations.push({
+          flagVariantId: variant.id,
+          flagVariantKey: variant.key,
+          experimentRole: index === 0 ? 'control' : 'treatment',
+          allocationPercentage: percentage,
+          description: `${variant.name} - ${index === 0 ? 'Control' : 'Treatment'} group`,
+        });
+      });
+      break;
+    }
+
+    case 'factorial': {
+      // Factorial: assign variants to factor combinations
+      if (factorialConfig && factorialConfig.factors.length > 0) {
+        const numCombinations = factorialConfig.factors.reduce(
+          (total, factor) => total * factor.levels.length,
+          1
+        );
+        const percentage = 100 / Math.max(flagVariants.length, numCombinations);
+
+        flagVariants.forEach((variant, index) => {
+          allocations.push({
+            flagVariantId: variant.id,
+            flagVariantKey: variant.key,
+            experimentRole: index === 0 ? 'control' : (`treatment_${index}` as any),
+            allocationPercentage: percentage,
+            description: `${variant.name} - Factorial condition ${index + 1}`,
+          });
+        });
+      } else {
+        // Fallback to even split
+        const percentage = 100 / flagVariants.length;
+        flagVariants.forEach((variant, index) => {
+          allocations.push({
+            flagVariantId: variant.id,
+            flagVariantKey: variant.key,
+            experimentRole: index === 0 ? 'control' : 'treatment',
+            allocationPercentage: percentage,
+            description: variant.name,
+          });
+        });
+      }
+      break;
+    }
+
+    case 'switchback': {
+      // Switchback: all users see all variants over time
+      // Equal allocation across time periods
+      const percentage = 100 / flagVariants.length;
+      flagVariants.forEach((variant, index) => {
+        allocations.push({
+          flagVariantId: variant.id,
+          flagVariantKey: variant.key,
+          experimentRole: index === 0 ? 'control' : 'treatment',
+          allocationPercentage: percentage,
+          description: `${variant.name} - Time period ${index + 1}`,
+        });
+      });
+      break;
+    }
+
+    case 'stepped_wedge': {
+      // Stepped wedge: clusters roll out gradually
+      // Start with control, gradually shift to treatment
+      const percentage = 100 / flagVariants.length;
+      flagVariants.forEach((variant, index) => {
+        allocations.push({
+          flagVariantId: variant.id,
+          flagVariantKey: variant.key,
+          experimentRole: index === 0 ? 'control' : 'treatment',
+          allocationPercentage: percentage,
+          description: `${variant.name} - ${index === 0 ? 'Initial control' : 'Rollout treatment'}`,
+        });
+      });
+      break;
+    }
+  }
+
+  return allocations;
+}
+
 export default function CreateExperimentWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -92,6 +190,11 @@ export default function CreateExperimentWizard() {
     secondaryMetrics: [],
     variantAllocations: [],
   });
+
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
+  // Mutation hook for creating experiment
+  const { mutate: createExperiment, isPending: isCreating } = useCreateExperiment();
 
   const canProceed = () => {
     switch (currentStep) {
@@ -124,6 +227,74 @@ export default function CreateExperimentWizard() {
 
   const handleCancel = () => {
     navigate('/experiments');
+  };
+
+  const handleSubmit = () => {
+    // Validate wizard state
+    if (!wizardState.featureFlagId || !wizardState.designType || !wizardState.featureFlag) {
+      setSubmissionError('Missing required fields. Please complete all steps.');
+      return;
+    }
+
+    // Generate variant allocations from flag variants
+    const variantAllocations = generateVariantAllocations(
+      wizardState.designType,
+      wizardState.featureFlag.variants,
+      wizardState.factorialConfig
+    );
+
+    // Build experiment form data
+    const experimentData: CreateExperimentForm = {
+      name: wizardState.experimentName,
+      key: wizardState.experimentKey,
+      description: wizardState.description,
+      featureFlagId: wizardState.featureFlagId,
+      variantAllocations,
+      design_type: wizardState.designType,
+      primaryMetric: wizardState.primaryMetric,
+      secondaryMetrics: wizardState.secondaryMetrics,
+    };
+
+    // Add design-specific configuration
+    switch (wizardState.designType) {
+      case 'factorial':
+        if (wizardState.factorialConfig) {
+          experimentData.factors = wizardState.factorialConfig.factors;
+        }
+        break;
+      case 'switchback':
+        if (wizardState.switchbackConfig) {
+          experimentData.switchback_config = {
+            switch_duration_seconds: wizardState.switchbackConfig.periodLengthMinutes * 60,
+            switch_unit: 'time',
+          };
+        }
+        break;
+      case 'stepped_wedge':
+        if (wizardState.steppedWedgeConfig) {
+          experimentData.stepped_wedge_config = {
+            num_steps: wizardState.steppedWedgeConfig.stepsPerCluster,
+            step_duration_seconds: wizardState.steppedWedgeConfig.stepLengthDays * 86400,
+            rollout_order: 'sequential',
+          };
+        }
+        break;
+    }
+
+    // Create experiment
+    createExperiment(experimentData, {
+      onSuccess: (newExperiment) => {
+        // Navigate to experiment detail page
+        navigate(`/experiments/${newExperiment.id}`);
+      },
+      onError: (error) => {
+        setSubmissionError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to create experiment. Please try again.'
+        );
+      },
+    });
   };
 
   const renderStep = () => {
@@ -274,15 +445,36 @@ export default function CreateExperimentWizard() {
               </button>
             ) : (
               <button
-                onClick={() => {/* Handle submission */}}
-                className="inline-flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={handleSubmit}
+                disabled={isCreating}
+                className={`inline-flex items-center px-6 py-2 rounded-lg transition-colors ${
+                  isCreating
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white`}
               >
-                <Check className="w-5 h-5 mr-2" />
-                Create Experiment
+                {isCreating ? (
+                  <>
+                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5 mr-2" />
+                    Create Experiment
+                  </>
+                )}
               </button>
             )}
           </div>
         </div>
+
+        {/* Error Display */}
+        {submissionError && (
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-900 dark:text-red-100">{submissionError}</p>
+          </div>
+        )}
       </div>
     </div>
   );

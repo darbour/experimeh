@@ -5,44 +5,15 @@
  * This is the foundation layer - flags must be created before experiments.
  */
 
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Flag, Link as LinkIcon } from 'lucide-react';
+import { Plus, Flag, Link as LinkIcon, AlertCircle, Loader } from 'lucide-react';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 export default function FeatureFlagsList() {
   const navigate = useNavigate();
+  const { data, isLoading, error } = useFeatureFlags();
 
-  // Mock data - in production, this would come from API
-  const [flags] = useState([
-    {
-      id: '1',
-      key: 'new_checkout_button',
-      name: 'New Checkout Button',
-      status: 'enabled',
-      variants: [
-        { key: 'control', name: 'Blue Button' },
-        { key: 'treatment', name: 'Green Button' },
-      ],
-      linkedExperiments: [
-        { experimentId: 'exp-1', experimentKey: 'button_color_test', status: 'active' },
-      ],
-      environment: 'production',
-      createdAt: new Date('2025-01-15'),
-    },
-    {
-      id: '2',
-      key: 'personalized_recommendations',
-      name: 'Personalized Recommendations',
-      status: 'enabled',
-      variants: [
-        { key: 'off', name: 'Generic Recommendations' },
-        { key: 'on', name: 'ML-Based Recommendations' },
-      ],
-      linkedExperiments: [],
-      environment: 'production',
-      createdAt: new Date('2025-01-10'),
-    },
-  ]);
+  const flags = data?.data || [];
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -52,6 +23,45 @@ export default function FeatureFlagsList() {
     };
     return styles[status as keyof typeof styles] || styles.disabled;
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">Loading feature flags...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Failed to load feature flags
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {error instanceof Error ? error.message : 'An unexpected error occurred'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

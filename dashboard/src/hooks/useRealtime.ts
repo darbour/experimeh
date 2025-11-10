@@ -14,7 +14,7 @@ export function useRealtimeExperiment(
 ) {
   const { enabled = true, interval = 5000 } = options;
   const queryClient = useQueryClient();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled || !experimentId) return;
@@ -45,7 +45,7 @@ export function useRealtimeExperiment(
 export function useRealtimeExperiments(options: UseRealtimeOptions = {}) {
   const { enabled = true, interval = 10000 } = options;
   const queryClient = useQueryClient();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -104,7 +104,7 @@ export function useSmartRealtime(experiment?: Experiment | null) {
 export function useRealtimeDashboard(options: UseRealtimeOptions = {}) {
   const { enabled = true, interval = 15000 } = options;
   const queryClient = useQueryClient();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
