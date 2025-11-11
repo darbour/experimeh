@@ -1,6 +1,8 @@
 /**
  * Feature flag routes
  * Handles CRUD operations for feature flags
+ *
+ * ENHANCED: Now uses UnifiedAssignmentService for evaluation
  */
 
 import { Router, Request, Response } from 'express';
@@ -18,11 +20,21 @@ import {
   evaluateFlagQuerySchema,
 } from '../validators/featureFlag';
 import { FeatureFlag } from '../../types';
+import { UnifiedAssignmentService } from '../../services/unified-assignment-service';
+import { experiments } from './experiments';
 
 const router = Router();
 
 // In-memory storage (replace with database in production)
-const featureFlags = new Map<string, FeatureFlag>();
+export const featureFlags = new Map<string, FeatureFlag>();
+
+// Initialize unified assignment service
+const assignmentService = new UnifiedAssignmentService({
+  enableCache: true,
+  cacheTtlSeconds: 300, // 5 minutes
+  enableExposureLogging: true,
+  logToConsole: process.env.NODE_ENV === 'development',
+});
 
 /**
  * POST /api/v1/flags
@@ -206,6 +218,8 @@ router.delete(
 /**
  * GET /api/v1/flags/:key/evaluate
  * Evaluate a feature flag for a specific unit
+ *
+ * ENHANCED: Now uses UnifiedAssignmentService which integrates experiments
  */
 router.get(
   '/:key/evaluate',
@@ -217,58 +231,43 @@ router.get(
   }),
   asyncHandler(async (req: Request, res: Response) => {
     const { key } = req.params;
-    const { unitId } = req.query;
+    const { unitId, context } = req.query;
 
-    // Find flag by key
-    const flag = Array.from(featureFlags.values()).find((f) => f.key === key);
+    // Update assignment service with latest data
+    assignmentService.setFeatureFlags(Array.from(featureFlags.values()));
+    assignmentService.setExperiments(Array.from(experiments.values()));
 
-    if (!flag) {
-      throw new ApiError('Feature flag not found', 404);
-    }
-
-    // If flag is disabled, return default value
-    if (!flag.enabled) {
-      res.json({
-        success: true,
-        data: {
-          key: flag.key,
-          value: flag.defaultValue,
-          enabled: false,
-          reason: 'flag_disabled',
-        },
-      });
-      return;
-    }
-
-    // Evaluate targeting rules
-    // In production, this would use a rule engine
-    let selectedVariant = null;
-
-    if (flag.variants && flag.variants.length > 0) {
-      // Simple hash-based variant selection
-      const hash = simpleHash(String(unitId) + flag.key);
-      const targetWeight = hash % 100;
-
-      let cumulativeWeight = 0;
-      for (const variant of flag.variants) {
-        cumulativeWeight += variant.weight;
-        if (targetWeight < cumulativeWeight) {
-          selectedVariant = variant;
-          break;
-        }
-      }
-    }
-
-    const value = selectedVariant ? selectedVariant.value : flag.defaultValue;
+    // Evaluate using unified assignment service
+    const result = await assignmentService.evaluate({
+      flagKey: key,
+      unitId: String(unitId),
+      unitType: 'user',
+      context: context ? JSON.parse(String(context)) : undefined,
+    });
 
     res.json({
       success: true,
       data: {
-        key: flag.key,
-        value,
-        enabled: true,
-        variant: selectedVariant?.key,
-        reason: selectedVariant ? 'variant_assigned' : 'default_value',
+        flagKey: result.flagKey,
+        flagId: result.flagId,
+        variantKey: result.variantKey,
+        variantId: result.variantId,
+        value: result.value,
+        reason: result.reason,
+        // Include experiment context if assigned via experiment
+        experiment: result.experiment
+          ? {
+              id: result.experiment.id,
+              key: result.experiment.key,
+              name: result.experiment.name,
+              designType: result.experiment.designType,
+              variantRole: result.experiment.variantRole,
+            }
+          : undefined,
+        exposureId: result.exposureId,
+        timestamp: result.timestamp,
+        fromCache: result.fromCache,
+        metadata: result.metadata,
       },
     });
   })

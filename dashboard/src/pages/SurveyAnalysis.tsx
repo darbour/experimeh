@@ -5,7 +5,7 @@ import { SurveyAnalysis } from '../types';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 
-export default function SurveyExperiments() {
+export default function SurveyAnalysisPage() {
   const { data: analyses, isLoading } = useSurveyAnalyses();
   const deleteAnalysis = useDeleteAnalysis();
   const [filter, setFilter] = useState<'all' | 'completed' | 'running' | 'failed'>('all');

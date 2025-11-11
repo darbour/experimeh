@@ -11,6 +11,7 @@ import {
   X,
   Activity,
   FileText,
+  Flag,
 } from 'lucide-react';
 import { useConnectionStatus } from '../hooks/useRealtime';
 
@@ -32,8 +33,9 @@ export default function Layout({ children }: LayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Feature Flags', href: '/flags', icon: Flag },
     { name: 'Experiments', href: '/experiments', icon: FlaskConical },
-    { name: 'Survey Experiments', href: '/survey-experiments', icon: FileText },
+    { name: 'Survey Analysis', href: '/survey-experiments', icon: FileText },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 

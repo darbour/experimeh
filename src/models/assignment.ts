@@ -26,6 +26,18 @@ export enum AssignmentReason {
   INELIGIBLE = 'ineligible',
   /** Experiment not running */
   NOT_RUNNING = 'not_running',
+  /** Assigned via active experiment allocation */
+  EXPERIMENT_ALLOCATION = 'experiment_allocation',
+  /** Assigned via feature flag default rollout */
+  FLAG_ROLLOUT = 'flag_rollout',
+  /** Flag disabled, using default value */
+  FLAG_DISABLED = 'flag_disabled',
+  /** Default value (no rules matched) */
+  DEFAULT = 'default',
+  /** Flag not found */
+  NOT_FOUND = 'not_found',
+  /** Error during evaluation */
+  ERROR = 'error',
 }
 
 /**
@@ -461,4 +473,114 @@ export function getVariantKey(assignment: DesignSpecificAssignment): string {
     case 'stepped_wedge':
       return assignment.data.inTreatment ? 'treatment' : 'control';
   }
+}
+
+/**
+ * UNIFIED ASSIGNMENT RESULT
+ *
+ * This is the core type that bridges feature flags and experiments.
+ * When a feature flag is evaluated, it may have an active experiment,
+ * in which case the result includes full experiment context.
+ */
+export interface UnifiedAssignmentResult {
+  /** Flag key that was evaluated */
+  flagKey: string;
+  /** Flag ID */
+  flagId: string;
+  /** Variant key assigned */
+  variantKey: string;
+  /** Variant ID */
+  variantId: string;
+  /** Actual value to return to the application */
+  value: unknown;
+  /** Reason for this assignment */
+  reason: AssignmentReason;
+
+  /** Experiment context (if assigned via experiment) */
+  experiment?: {
+    /** Experiment ID */
+    id: string;
+    /** Experiment key */
+    key: string;
+    /** Experiment name */
+    name: string;
+    /** Design type */
+    designType: string;
+    /** Role in experiment (control/treatment) */
+    variantRole: string;
+    /** Allocation percentage for this variant */
+    allocationPercentage: number;
+    /** Design-specific assignment data */
+    designSpecific?: DesignSpecificAssignment;
+  };
+
+  /** Unique exposure ID for tracking */
+  exposureId: string;
+  /** Timestamp of assignment */
+  timestamp: Date;
+
+  /** Whether result came from cache */
+  fromCache: boolean;
+  /** ID of matched targeting rule (if any) */
+  matchedRuleId?: string;
+
+  /** Performance and debugging metadata */
+  metadata: {
+    /** Evaluation duration in milliseconds */
+    evaluationTimeMs: number;
+    /** Hash value used for bucketing */
+    bucketHash?: number;
+    /** Bucket value (0-99) used for allocation */
+    bucketValue?: number;
+    /** Cache key used (if cached) */
+    cacheKey?: string;
+  };
+}
+
+/**
+ * Request for unified feature flag evaluation
+ */
+export interface UnifiedAssignmentRequest {
+  /** Feature flag key to evaluate */
+  flagKey: string;
+  /** Unit ID (user, device, etc.) */
+  unitId: string;
+  /** Unit type */
+  unitType?: string;
+  /** Evaluation context */
+  context?: AssignmentContext;
+  /** Optional: Force a specific variant (for testing) */
+  forceVariant?: string;
+  /** Optional: Skip experiment assignment (use flag only) */
+  skipExperiment?: boolean;
+}
+
+/**
+ * Batch unified assignment request
+ */
+export interface BatchUnifiedAssignmentRequest {
+  /** List of flag keys to evaluate */
+  flagKeys: string[];
+  /** Unit ID (shared across all flags) */
+  unitId: string;
+  /** Unit type */
+  unitType?: string;
+  /** Shared context */
+  context?: AssignmentContext;
+}
+
+/**
+ * Batch unified assignment response
+ */
+export interface BatchUnifiedAssignmentResponse {
+  /** Results keyed by flag key */
+  assignments: Record<string, UnifiedAssignmentResult>;
+  /** Any errors that occurred */
+  errors: Array<{
+    flagKey: string;
+    error: string;
+    code: string;
+  }>;
+  /** Total evaluation time */
+  totalTimeMs: number;
 }

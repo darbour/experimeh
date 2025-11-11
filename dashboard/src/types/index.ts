@@ -1,3 +1,70 @@
+// Feature Flag Types
+export type FlagStatus = 'enabled' | 'disabled' | 'archived';
+
+export interface FlagVariant {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  value: unknown;
+  weight?: number;
+}
+
+export interface LinkedExperiment {
+  experimentId: string;
+  experimentKey: string;
+  status: 'draft' | 'active' | 'paused' | 'completed';
+  priority: number;
+  linkedAt: Date | string;
+  activatedAt?: Date | string;
+  completedAt?: Date | string;
+}
+
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  status: FlagStatus;
+  variants: FlagVariant[];
+  defaultVariantId: string;
+  linkedExperiments: LinkedExperiment[];
+  environment: string;
+  tags?: string[];
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  createdBy?: string;
+}
+
+export interface CreateFeatureFlagForm {
+  key: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  variants: Omit<FlagVariant, 'id'>[];
+  defaultVariantId?: string;
+  environment: string;
+  tags?: string[];
+}
+
+export interface FeatureFlagFilters {
+  status?: FlagStatus[];
+  environment?: string[];
+  search?: string;
+  hasExperiments?: boolean;
+}
+
+// Variant Allocation Types (for linking flag variants to experiment roles)
+export interface VariantAllocation {
+  id?: string;
+  flagVariantId: string;
+  flagVariantKey: string;
+  experimentRole: 'control' | 'treatment' | 'treatment_1' | 'treatment_2' | 'treatment_3';
+  allocationPercentage: number;
+  description?: string;
+}
+
 // Experiment Types
 export type ExperimentStatus = 'draft' | 'running' | 'paused' | 'completed' | 'archived';
 
@@ -43,11 +110,21 @@ export interface Experiment {
   id: string;
   name: string;
   description: string;
-  flag_key: string;
+  key: string;
+
+  // Feature flag relationship (REQUIRED)
+  featureFlagId: string;
+  variantAllocations: VariantAllocation[];
+
+  // Legacy (deprecated - use featureFlagId)
+  flag_key?: string;
+
   design_type: DesignType;
   status: ExperimentStatus;
   variants: Variant[];
   metrics: Metric[];
+  primaryMetric: string;
+  secondaryMetrics?: string[];
   start_date?: string;
   end_date?: string;
 
@@ -193,11 +270,18 @@ export interface SortConfig {
 // Form Types
 export interface CreateExperimentForm {
   name: string;
+  key: string;
   description: string;
-  flag_key: string;
+
+  // Feature flag relationship (REQUIRED)
+  featureFlagId: string;
+  variantAllocations: Omit<VariantAllocation, 'id'>[];
+
   design_type: DesignType;
-  variants: Variant[];
-  metrics: Metric[];
+  primaryMetric: string;
+  secondaryMetrics?: string[];
+  variants?: Variant[];
+  metrics?: Metric[];
   start_date?: string;
   end_date?: string;
   factors?: FactorialFactor[];

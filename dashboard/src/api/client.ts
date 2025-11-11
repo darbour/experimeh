@@ -8,6 +8,9 @@ import type {
   PaginatedResponse,
   ApiResponse,
   DashboardStats,
+  FeatureFlag,
+  CreateFeatureFlagForm,
+  FeatureFlagFilters,
 } from '../types';
 
 class ApiClient {
@@ -123,6 +126,98 @@ class ApiClient {
     const response = await this.client.post<ApiResponse<Experiment>>(
       `/experiments/${id}/archive`
     );
+    return response.data.data;
+  }
+
+  // Feature Flags API
+
+  async getFeatureFlags(filters?: FeatureFlagFilters): Promise<PaginatedResponse<FeatureFlag>> {
+    const params: Record<string, any> = {};
+
+    if (filters?.status) {
+      params.status = filters.status.join(',');
+    }
+    if (filters?.environment) {
+      params.environment = filters.environment.join(',');
+    }
+    if (filters?.search) {
+      params.search = filters.search;
+    }
+    if (filters?.hasExperiments !== undefined) {
+      params.hasExperiments = filters.hasExperiments;
+    }
+
+    // Backend returns: { success, data, pagination }
+    // Transform to: { data, total, page, page_size, total_pages }
+    const response = await this.client.get<{
+      success: boolean;
+      data: FeatureFlag[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>('/flags', { params });
+
+    return {
+      data: response.data.data,
+      total: response.data.pagination.total,
+      page: response.data.pagination.page,
+      page_size: response.data.pagination.limit,
+      total_pages: response.data.pagination.totalPages,
+    };
+  }
+
+  async getFeatureFlag(id: string): Promise<FeatureFlag> {
+    const response = await this.client.get<ApiResponse<FeatureFlag>>(`/flags/${id}`);
+    return response.data.data;
+  }
+
+  async getFeatureFlagByKey(key: string): Promise<FeatureFlag> {
+    const response = await this.client.get<ApiResponse<FeatureFlag>>(`/flags/key/${key}`);
+    return response.data.data;
+  }
+
+  async createFeatureFlag(data: CreateFeatureFlagForm): Promise<FeatureFlag> {
+    const response = await this.client.post<ApiResponse<FeatureFlag>>('/flags', data);
+    return response.data.data;
+  }
+
+  async updateFeatureFlag(id: string, data: Partial<FeatureFlag>): Promise<FeatureFlag> {
+    const response = await this.client.put<ApiResponse<FeatureFlag>>(
+      `/flags/${id}`,
+      data
+    );
+    return response.data.data;
+  }
+
+  async deleteFeatureFlag(id: string): Promise<void> {
+    await this.client.delete(`/flags/${id}`);
+  }
+
+  async toggleFeatureFlag(id: string, enabled: boolean): Promise<FeatureFlag> {
+    const response = await this.client.patch<ApiResponse<FeatureFlag>>(
+      `/flags/${id}/toggle`,
+      { enabled }
+    );
+    return response.data.data;
+  }
+
+  async evaluateFeatureFlag(
+    key: string,
+    unitId: string,
+    context?: Record<string, any>
+  ): Promise<{
+    flagKey: string;
+    variantKey: string;
+    value: unknown;
+    experiment?: {
+      id: string;
+      key: string;
+      name: string;
+      designType: string;
+      variantRole: string;
+    };
+  }> {
+    const response = await this.client.get(`/flags/${key}/evaluate`, {
+      params: { unitId, context: context ? JSON.stringify(context) : undefined },
+    });
     return response.data.data;
   }
 

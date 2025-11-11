@@ -1,6 +1,8 @@
 /**
  * Experiment routes
  * Handles CRUD operations for experiments
+ *
+ * ENHANCED: Now enforces feature flag relationships and updates linked experiments
  */
 
 import { Router, Request, Response } from 'express';
@@ -16,15 +18,18 @@ import {
   listExperimentsQuerySchema,
 } from '../validators/experiment';
 import { Experiment } from '../../types';
+import { featureFlags } from './feature-flags';
 
 const router = Router();
 
 // In-memory storage (replace with database in production)
-const experiments = new Map<string, Experiment>();
+export const experiments = new Map<string, Experiment>();
 
 /**
  * POST /api/v1/experiments
  * Create a new experiment
+ *
+ * ENHANCED: Validates feature flag exists and updates flag's linkedExperiments
  */
 router.post(
   '/',
@@ -43,10 +48,45 @@ router.post(
       throw new ApiError('Experiment with this key already exists', 409);
     }
 
-    // Create new experiment
+    // VALIDATE: Feature flag must exist
+    const flag = featureFlags.get(experimentData.featureFlagId);
+    if (!flag) {
+      throw new ApiError(`Feature flag with ID ${experimentData.featureFlagId} not found`, 404);
+    }
+
+    // VALIDATE: Variant allocations match flag variants
+    const flagVariantIds = flag.variants.map((v) => v.id);
+    const allocationVariantIds = experimentData.variantAllocations.map((a: any) => a.flagVariantId);
+    const invalidIds = allocationVariantIds.filter((id: string) => !flagVariantIds.includes(id));
+
+    if (invalidIds.length > 0) {
+      throw new ApiError(
+        `Invalid flag variant IDs in allocations: ${invalidIds.join(', ')}. ` +
+          `Available variants: ${flagVariantIds.join(', ')}`,
+        400
+      );
+    }
+
+    // VALIDATE: Allocations sum to 100%
+    const totalAllocation = experimentData.variantAllocations.reduce(
+      (sum: number, a: any) => sum + a.allocationPercentage,
+      0
+    );
+    if (Math.abs(totalAllocation - 100) > 0.01) {
+      throw new ApiError(
+        `Variant allocations must sum to 100%, got ${totalAllocation}%`,
+        400
+      );
+    }
+
+    // Create new experiment with generated IDs for variant allocations
     const experiment: Experiment = {
       id: uuidv4(),
       ...experimentData,
+      variantAllocations: experimentData.variantAllocations.map((a: any) => ({
+        ...a,
+        id: uuidv4(),
+      })),
       status: 'draft',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -54,9 +94,29 @@ router.post(
 
     experiments.set(experiment.id, experiment);
 
+    // UPDATE: Add experiment to flag's linkedExperiments
+    if (!flag.linkedExperiments) {
+      flag.linkedExperiments = [];
+    }
+
+    flag.linkedExperiments.push({
+      experimentId: experiment.id,
+      experimentKey: experiment.key,
+      status: 'draft',
+      priority: flag.linkedExperiments.length + 1, // Higher priority for newer experiments
+      linkedAt: new Date(),
+    });
+
+    featureFlags.set(flag.id, flag);
+
     res.status(201).json({
       success: true,
       data: experiment,
+      linkedFlag: {
+        id: flag.id,
+        key: flag.key,
+        name: flag.name,
+      },
     });
   })
 );
@@ -221,6 +281,73 @@ router.delete(
     res.json({
       success: true,
       message: 'Experiment deleted successfully',
+    });
+  })
+);
+
+/**
+ * POST /api/v1/experiments/create-with-flag
+ * Create both flag and experiment in one transaction
+ *
+ * NEW: Convenience endpoint for creating flag + experiment together
+ */
+router.post(
+  '/create-with-flag',
+  apiKeyAuth,
+  writeRateLimit,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { flag, experiment } = req.body;
+
+    // Validate both objects exist
+    if (!flag || !experiment) {
+      throw new ApiError('Both flag and experiment objects required', 400);
+    }
+
+    // Create flag first
+    const createdFlag: FeatureFlag = {
+      id: uuidv4(),
+      ...flag,
+      linkedExperiments: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    featureFlags.set(createdFlag.id, createdFlag);
+
+    // Create experiment with flag ID
+    const createdExperiment: Experiment = {
+      id: uuidv4(),
+      ...experiment,
+      featureFlagId: createdFlag.id,
+      variantAllocations: experiment.variantAllocations.map((a: any) => ({
+        ...a,
+        id: uuidv4(),
+      })),
+      status: 'draft',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    experiments.set(createdExperiment.id, createdExperiment);
+
+    // Link them
+    createdFlag.linkedExperiments.push({
+      experimentId: createdExperiment.id,
+      experimentKey: createdExperiment.key,
+      status: 'draft',
+      priority: 1,
+      linkedAt: new Date(),
+    });
+
+    featureFlags.set(createdFlag.id, createdFlag);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        flag: createdFlag,
+        experiment: createdExperiment,
+      },
+      message: 'Flag and experiment created and linked successfully',
     });
   })
 );

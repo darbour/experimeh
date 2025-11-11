@@ -142,6 +142,27 @@ export interface RolloutConfig {
 }
 
 /**
+ * Links a feature flag to an experiment
+ * Supports multiple experiments over time (e.g., A/B test, then A/C test)
+ */
+export interface LinkedExperiment {
+  /** Experiment ID */
+  experimentId: string;
+  /** Experiment key for convenience */
+  experimentKey: string;
+  /** Current status of this experiment link */
+  status: 'draft' | 'active' | 'paused' | 'completed';
+  /** Priority if multiple experiments are active (higher = takes precedence) */
+  priority: number;
+  /** When this link was created */
+  linkedAt: Date;
+  /** When this experiment was activated */
+  activatedAt?: Date;
+  /** When this experiment was completed/stopped */
+  completedAt?: Date;
+}
+
+/**
  * Schedule for automatic flag changes
  */
 export interface Schedule {
@@ -236,8 +257,8 @@ export interface FeatureFlag {
   /** Percentage rollout configuration */
   rollout: RolloutConfig;
 
-  /** Associated experiment ID (if flag is linked to experiment) */
-  experimentId?: string;
+  /** Linked experiments (supports multiple experiments over time) */
+  linkedExperiments: LinkedExperiment[];
   /** Environment (production, staging, development) */
   environment: string;
 
