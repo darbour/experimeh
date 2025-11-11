@@ -10,6 +10,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Check, Loader } from 'lucide-react';
 import { useCreateExperiment } from '../../hooks/useExperiments';
 import type { CreateExperimentForm, VariantAllocation, FeatureFlag } from '../../types';
+import {
+  validateExperimentKey,
+  validateExperimentName,
+  validatePrimaryMetric,
+  validateVariantCount,
+} from '../../utils/validation';
 import Step1_SelectFlag from './Step1_SelectFlag';
 import Step2_DesignType from './Step2_DesignType';
 import Step3_Configure from './Step3_Configure';
@@ -84,6 +90,40 @@ function getExperimentRole(index: number): VariantAllocation['experimentRole'] {
 }
 
 /**
+ * Generate all combinations for a factorial design
+ *
+ * For example, with factors:
+ * - Factor A: [level1, level2]
+ * - Factor B: [level1, level2]
+ *
+ * Returns: [
+ *   ['level1', 'level1'],
+ *   ['level1', 'level2'],
+ *   ['level2', 'level1'],
+ *   ['level2', 'level2']
+ * ]
+ */
+function generateFactorialCombinations(
+  factors: Array<{ name: string; levels: string[] }>
+): string[][] {
+  if (factors.length === 0) return [[]];
+  if (factors.length === 1) return factors[0].levels.map((level) => [level]);
+
+  // Recursive cartesian product
+  const [firstFactor, ...restFactors] = factors;
+  const restCombinations = generateFactorialCombinations(restFactors);
+
+  const combinations: string[][] = [];
+  for (const level of firstFactor.levels) {
+    for (const restCombo of restCombinations) {
+      combinations.push([level, ...restCombo]);
+    }
+  }
+
+  return combinations;
+}
+
+/**
  * Generate variant allocations based on design type and flag variants
  */
 function generateVariantAllocations(
@@ -111,24 +151,37 @@ function generateVariantAllocations(
 
     case 'factorial': {
       // Factorial: assign variants to factor combinations
-      if (factorialConfig && factorialConfig.factors.length > 0) {
-        const numCombinations = factorialConfig.factors.reduce(
-          (total, factor) => total * factor.levels.length,
-          1
-        );
-        const percentage = 100 / Math.max(flagVariants.length, numCombinations);
+      if (factorialConfig && factorialConfig.factors.length >= 2) {
+        // Generate all factorial combinations
+        const combinations = generateFactorialCombinations(factorialConfig.factors);
+        const numCombinations = combinations.length;
+
+        // Validate: number of variants should match number of combinations
+        if (flagVariants.length !== numCombinations) {
+          console.warn(
+            `Factorial design: Expected ${numCombinations} variants for ${factorialConfig.factors.length} factors, but got ${flagVariants.length}. Using equal split.`
+          );
+        }
+
+        const percentage = 100 / flagVariants.length;
 
         flagVariants.forEach((variant, index) => {
+          // Map variant to factorial combination
+          const combination = combinations[index] || combinations[0]; // Fallback to first if index out of bounds
+          const combinationDesc = combination
+            .map((level, factorIdx) => `${factorialConfig.factors[factorIdx].name}=${level}`)
+            .join(', ');
+
           allocations.push({
             flagVariantId: variant.id,
             flagVariantKey: variant.key,
             experimentRole: getExperimentRole(index),
             allocationPercentage: percentage,
-            description: `${variant.name} - Factorial condition ${index + 1}`,
+            description: `${variant.name} (${combinationDesc})`,
           });
         });
       } else {
-        // Fallback to even split
+        // Fallback to even split if no proper factorial config
         const percentage = 100 / flagVariants.length;
         flagVariants.forEach((variant, index) => {
           allocations.push({
@@ -208,8 +261,28 @@ export default function CreateExperimentWizard() {
         return !!wizardState.featureFlagId;
       case 2:
         return !!wizardState.designType;
-      case 3:
-        return wizardState.experimentName && wizardState.experimentKey && wizardState.primaryMetric;
+      case 3: {
+        // Validate all required fields
+        if (!wizardState.experimentName || !wizardState.experimentKey || !wizardState.primaryMetric) {
+          return false;
+        }
+
+        // Validate field formats
+        const nameValid = validateExperimentName(wizardState.experimentName).success;
+        const keyValid = validateExperimentKey(wizardState.experimentKey).success;
+        const metricValid = validatePrimaryMetric(wizardState.primaryMetric).success;
+
+        // Validate variant count for design type
+        let variantCountValid = true;
+        if (wizardState.designType && wizardState.featureFlag) {
+          variantCountValid = validateVariantCount(
+            wizardState.designType,
+            wizardState.featureFlag.variants.length
+          ).success;
+        }
+
+        return nameValid && keyValid && metricValid && variantCountValid;
+      }
       case 4:
         return !!wizardState.powerAnalysis;
       case 5:
