@@ -17,7 +17,8 @@ import {
   experimentIdSchema,
   listExperimentsQuerySchema,
 } from '../validators/experiment';
-import { Experiment } from '../../types';
+import { Experiment } from '../../models/experiment';
+import { FeatureFlag, FeatureFlagStatus } from '../../models/feature-flag';
 import { featureFlags } from './feature-flags';
 
 const router = Router();
@@ -376,7 +377,7 @@ router.get(
       experimentId: id,
       status: experiment.status,
       sampleSize: 10000,
-      startDate: experiment.startDate || experiment.createdAt,
+      startDate: experiment.startDate || experiment.audit.createdAt,
       mainEffects: [
         {
           factor: experiment.variants[0]?.key || 'control',

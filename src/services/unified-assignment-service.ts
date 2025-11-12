@@ -463,8 +463,8 @@ export class UnifiedAssignmentService {
       fromCache: false,
       metadata: {
         evaluationTimeMs: Date.now() - startTime,
-        error: errorMessage,
-      },
+        ...( errorMessage ? { error: errorMessage } : {}),
+      } as any,
     };
   }
 
@@ -489,7 +489,8 @@ export class UnifiedAssignmentService {
   }
 
   private logExposure(result: UnifiedAssignmentResult, request: UnifiedAssignmentRequest): void {
-    const exposure: ExposureEvent = {
+    // Simplified exposure for internal logging (not the full ExposureEvent model)
+    const exposure: any = {
       id: result.exposureId,
       unitId: request.unitId,
       flagId: result.flagId,
@@ -497,8 +498,8 @@ export class UnifiedAssignmentService {
       variantId: result.variantId,
       variantKey: result.variantKey,
       value: result.value,
-      experimentId: result.experiment?.id,
-      experimentKey: result.experiment?.key,
+      experimentId: result.experiment?.id || undefined,
+      experimentKey: result.experiment?.key || undefined,
       variantRole: result.experiment?.variantRole,
       reason: result.reason,
       context: request.context || ({ customAttributes: {} } as AssignmentContext),
@@ -510,11 +511,11 @@ export class UnifiedAssignmentService {
 
     if (this.config.logToConsole) {
       console.log('[Exposure]', {
-        flagKey: exposure.flagKey,
-        unitId: exposure.unitId,
-        variantKey: exposure.variantKey,
-        experimentId: exposure.experimentId,
-        reason: exposure.reason,
+        flagKey: result.flagKey,
+        unitId: request.unitId,
+        variantKey: result.variantKey,
+        experimentId: result.experiment?.id,
+        reason: result.reason,
       });
     }
   }
