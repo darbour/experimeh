@@ -19,7 +19,7 @@ import {
   listFeatureFlagsQuerySchema,
   evaluateFlagQuerySchema,
 } from '../validators/featureFlag';
-import { FeatureFlag } from '../../types';
+import { FeatureFlag } from '../../models/feature-flag';
 import { UnifiedAssignmentService } from '../../services/unified-assignment-service';
 import { experiments } from './experiments';
 

@@ -18,6 +18,7 @@ import {
   listExperimentsQuerySchema,
 } from '../validators/experiment';
 import { Experiment } from '../../types';
+import { FeatureFlag } from '../../models/feature-flag';
 import { featureFlags } from './feature-flags';
 
 const router = Router();
