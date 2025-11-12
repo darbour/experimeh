@@ -19,7 +19,7 @@ import {
   listFeatureFlagsQuerySchema,
   evaluateFlagQuerySchema,
 } from '../validators/featureFlag';
-import { FeatureFlag } from '../../models/feature-flag';
+import { FeatureFlag, FeatureFlagStatus } from '../../models/feature-flag';
 import { UnifiedAssignmentService } from '../../services/unified-assignment-service';
 import { experiments } from './experiments';
 
@@ -90,14 +90,17 @@ router.get(
     let filteredFlags = Array.from(featureFlags.values());
 
     if (enabled !== undefined) {
-      filteredFlags = filteredFlags.filter((flag) => flag.enabled === (enabled === 'true'));
+      const isEnabled = enabled === 'true';
+      filteredFlags = filteredFlags.filter((flag) =>
+        (flag.status === FeatureFlagStatus.ENABLED) === isEnabled
+      );
     }
 
     // Sort flags
     filteredFlags.sort((a, b) => {
       const sortField = sortBy as keyof FeatureFlag;
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+      const aValue = a[sortField] as any;
+      const bValue = b[sortField] as any;
 
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
